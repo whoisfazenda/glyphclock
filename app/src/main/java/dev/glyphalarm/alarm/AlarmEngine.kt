@@ -16,6 +16,7 @@ import dev.glyphalarm.data.AppSettings
 import dev.glyphalarm.glyph.FrameSource
 import dev.glyphalarm.glyph.GlyphTrack
 import dev.glyphalarm.glyph.GlyphtoneParser
+import dev.glyphalarm.glyph.PulseSource
 import dev.glyphalarm.glyph.TrackSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -63,8 +64,8 @@ object AlarmEngine {
 
         val track = alarm.soundPath?.let { GlyphtoneParser.parseFile(File(it)) }
         _track.value = track
-        // The lights come only from the recording inside the chosen sound (Glyph Composer)
-        val src: FrameSource? = track?.let { TrackSource(it) }
+        // The lights follow the recording inside the chosen sound (Glyph Composer); without one a soft pulse plays
+        val src: FrameSource = track?.let { TrackSource(it) } ?: PulseSource()
         audioClock = src is TrackSource
 
         startedAt = SystemClock.elapsedRealtime()
