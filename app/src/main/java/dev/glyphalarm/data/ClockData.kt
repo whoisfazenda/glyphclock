@@ -136,12 +136,13 @@ object WorldRepo {
     }
 
     private val REGIONS = mapOf(
-        "Africa" to "Африка", "America" to "Америка", "Antarctica" to "Антарктида", "Arctic" to "Арктика",
-        "Asia" to "Азия", "Atlantic" to "Атлантика", "Australia" to "Австралия", "Europe" to "Европа",
-        "Indian" to "Индийский океан", "Pacific" to "Тихий океан",
+        "Africa" to ("Африка" to "Africa"), "America" to ("Америка" to "America"), "Antarctica" to ("Антарктида" to "Antarctica"),
+        "Arctic" to ("Арктика" to "Arctic"), "Asia" to ("Азия" to "Asia"), "Atlantic" to ("Атлантика" to "Atlantic"),
+        "Australia" to ("Австралия" to "Australia"), "Europe" to ("Европа" to "Europe"),
+        "Indian" to ("Индийский океан" to "Indian Ocean"), "Pacific" to ("Тихий океан" to "Pacific"),
     )
 
-    fun regionName(zoneId: String): String = zoneId.substringBefore('/', "").let { REGIONS[it] ?: it.replace('_', ' ') }
+    fun regionName(zoneId: String): String = zoneId.substringBefore('/', "").let { r -> REGIONS[r]?.let { tr(it.first, it.second) } ?: r.replace('_', ' ') }
 
     /** All selectable cities: Area/City ids only (no Etc/, no legacy aliases). */
     val allZones: List<String> by lazy {
@@ -227,13 +228,18 @@ object StopwatchRepo {
 
 // ---- app settings ------------------------------------------------------------------------------
 
-data class TimerSound(val path: String?, val name: String)
+data class TimerSound(val path: String?, val name: String, val uri: String? = null) {
+    fun title(): String = if (path == null || name.isBlank()) tr("Стандартный сигнал", "Default alarm") else name
+}
 
 object AppSettings {
-    private val _timerSound = MutableStateFlow(TimerSound(null, "Стандартный сигнал"))
+    private val _timerSound = MutableStateFlow(TimerSound(null, ""))
     val timerSound: StateFlow<TimerSound> = _timerSound.asStateFlow()
     private val _offset = MutableStateFlow(0)
     val syncOffsetMs: StateFlow<Int> = _offset.asStateFlow()
+    private val _riseSec = MutableStateFlow(30)
+    /** How long the volume (and the glyph intensity) takes to climb to the top. */
+    val riseSec: StateFlow<Int> = _riseSec.asStateFlow()
     private var loaded = false
 
     @Synchronized
@@ -241,7 +247,12 @@ object AppSettings {
         if (loaded) return
         val p = prefs(ctx)
         _offset.value = p.getInt("sync_offset_ms", 0)
-        _timerSound.value = TimerSound(p.getString("timer_path", null), p.getString("timer_name", "Стандартный сигнал") ?: "Стандартный сигнал")
+        _timerSound.value = TimerSound(
+            p.getString("timer_path", null),
+            (p.getString("timer_name", "") ?: "").let { if (it == "Стандартный сигнал") "" else it },
+            p.getString("timer_uri", null),
+        )
+        _riseSec.value = p.getInt("rise_sec", 30)
         loaded = true
     }
 
@@ -254,9 +265,15 @@ object AppSettings {
         prefs(ctx).edit().putInt("sync_offset_ms", _offset.value).apply()
     }
 
+    fun setRiseSec(ctx: Context, sec: Int) {
+        ensure(ctx)
+        _riseSec.value = sec.coerceIn(5, 120)
+        prefs(ctx).edit().putInt("rise_sec", _riseSec.value).apply()
+    }
+
     fun setTimerSound(ctx: Context, s: TimerSound) {
         ensure(ctx)
         _timerSound.value = s
-        prefs(ctx).edit().putString("timer_path", s.path).putString("timer_name", s.name).apply()
+        prefs(ctx).edit().putString("timer_path", s.path).putString("timer_name", s.name).putString("timer_uri", s.uri).apply()
     }
 }

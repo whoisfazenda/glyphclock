@@ -72,9 +72,9 @@ fun formatClock(hour: Int, minute: Int, is24: Boolean): Pair<String, String> {
  * 12-hour phones get AM/PM, 24-hour phones get the two-ring face (1–12 outside, 13–00 inside).
  */
 @Composable
-fun TimeDial(hour: Int, minute: Int, is24: Boolean, onChange: (hour: Int, minute: Int) -> Unit, modifier: Modifier = Modifier) {
+fun TimeDial(hour: Int, minute: Int, is24: Boolean, onChange: (hour: Int, minute: Int) -> Unit, modifier: Modifier = Modifier, startMode: Int = 0) {
     val n = LocalN.current
-    var mode by remember { mutableIntStateOf(0) } // 0 = hours, 1 = minutes
+    var mode by remember { mutableIntStateOf(startMode) } // 0 = hours, 1 = minutes
     val curHour by rememberUpdatedState(hour)
     val curMinute by rememberUpdatedState(minute)
     val cb by rememberUpdatedState(onChange)

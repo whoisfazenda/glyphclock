@@ -1,5 +1,6 @@
 package dev.glyphalarm.ui
 
+import dev.glyphalarm.data.tr
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -51,20 +52,20 @@ import kotlin.math.abs
 private fun dayWord(then: ZonedDateTime, local: ZonedDateTime): String {
     val d = then.toLocalDate().toEpochDay() - local.toLocalDate().toEpochDay()
     return when {
-        d == 0L -> "Сегодня"
-        d == 1L -> "Завтра"
-        d == -1L -> "Вчера"
+        d == 0L -> tr("Сегодня", "Today")
+        d == 1L -> tr("Завтра", "Tomorrow")
+        d == -1L -> tr("Вчера", "Yesterday")
         else -> then.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault()).replaceFirstChar { it.uppercase() }
     }
 }
 
 private fun offsetWord(then: ZonedDateTime, local: ZonedDateTime): String {
     val diff = (then.offset.totalSeconds - local.offset.totalSeconds) / 3600f
-    if (diff == 0f) return "то же время"
+    if (diff == 0f) return tr("то же время", "same time")
     val sign = if (diff > 0) "+" else "−"
     val v = abs(diff)
     val txt = if (v % 1f == 0f) "%d".format(v.toInt()) else "%.1f".format(v)
-    return "$sign$txt ч"
+    return "$sign$txt " + tr("ч", "h")
 }
 
 @Composable
@@ -85,14 +86,14 @@ fun WorldClockScreen(adding: Boolean, onAdding: (Boolean) -> Unit, onSettings: (
 
     val local = ZonedDateTime.now().also { tick }
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
-        ScreenTitle("Мировое время") { NIconButton(Ic.GEAR, onSettings) }
+        ScreenTitle(tr("Мировое время", "World clock")) { NIconButton(Ic.GEAR, onSettings) }
         LazyColumn(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = navBarClearance() + 16.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             item {
                 Column(Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, top = 8.dp)) {
-                    NCaps("Местное время · " + WorldRepo.cityName(local.zone.id))
+                    NCaps(tr("Местное время · ", "Local time · ") + WorldRepo.cityName(local.zone.id))
                     Spacer(Modifier.height(18.dp))
                     val (txt, suffix) = formatClock(local.hour, local.minute, is24)
                     Row(verticalAlignment = Alignment.Bottom) {
@@ -104,9 +105,9 @@ fun WorldClockScreen(adding: Boolean, onAdding: (Boolean) -> Unit, onSettings: (
                 }
             }
             item {
-                NSection("Города") {
+                NSection(tr("Города", "Cities")) {
                     if (zones.isNotEmpty()) Box(Modifier.clip(CircleShape).clickable { editing = !editing }.padding(horizontal = 10.dp, vertical = 6.dp)) {
-                        NCaps(if (editing) "Готово" else "Изменить", color = n.display)
+                        NCaps(if (editing) tr("Готово", "Done") else tr("Изменить", "Edit"), color = n.display)
                     }
                 }
             }
@@ -134,7 +135,7 @@ fun WorldClockScreen(adding: Boolean, onAdding: (Boolean) -> Unit, onSettings: (
                 }
             }
             if (zones.isEmpty()) item {
-                NText("Городов пока нет. Нажмите «+», чтобы добавить.", Modifier.nRow(groupShape(0, 1)).padding(20.dp), style = NType.label, color = n.secondary)
+                NText(tr("Городов пока нет. Нажмите «+», чтобы добавить.", "No cities yet. Tap “+” to add one."), Modifier.nRow(groupShape(0, 1)).padding(20.dp), style = NType.label, color = n.secondary)
             }
         }
     }
@@ -158,7 +159,7 @@ private fun CityPicker(taken: List<String>, onPick: (String) -> Unit, onBack: ()
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
         TopBar(onBack)
         Spacer(Modifier.height(8.dp))
-        Title("Добавить город", Modifier.padding(horizontal = 24.dp))
+        Title(tr("Добавить город", "Add a city"), Modifier.padding(horizontal = 24.dp))
         Spacer(Modifier.height(20.dp))
         BasicTextField(
             value = query, onValueChange = { query = it }, singleLine = true,
@@ -166,13 +167,13 @@ private fun CityPicker(taken: List<String>, onPick: (String) -> Unit, onBack: ()
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             decorationBox = { inner ->
                 Box(Modifier.fillMaxWidth().nCard(999.dp).padding(horizontal = 22.dp, vertical = 16.dp)) {
-                    if (query.isEmpty()) Text("Поиск города или региона", style = NType.body, color = n.disabled)
+                    if (query.isEmpty()) Text(tr("Поиск города или региона", "Search a city or region"), style = NType.body, color = n.disabled)
                     inner()
                 }
             },
         )
         Spacer(Modifier.height(16.dp))
-        if (results.isEmpty()) NText("Ничего не найдено", Modifier.padding(horizontal = 24.dp), style = NType.label, color = n.secondary)
+        if (results.isEmpty()) NText(tr("Ничего не найдено", "Nothing found"), Modifier.padding(horizontal = 24.dp), style = NType.label, color = n.secondary)
         LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             itemsIndexed(results, key = { _, id -> id }) { i, id ->
                 val t = ZonedDateTime.now(ZoneId.of(id))

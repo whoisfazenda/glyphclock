@@ -152,11 +152,12 @@ object AlarmEngine {
         player = p
 
         if (alarm.rise) {
+            val riseMs = AppSettings.riseSec.value * 1000L
             p.setVolume(0.15f, 0.15f)
             riseJob = scope.launch {
                 val t0 = SystemClock.elapsedRealtime()
                 while (isActive) {
-                    val f = ((SystemClock.elapsedRealtime() - t0) / 30_000f).coerceAtMost(1f)
+                    val f = ((SystemClock.elapsedRealtime() - t0) / riseMs.toFloat()).coerceAtMost(1f)
                     val v = 0.15f + 0.85f * f
                     runCatching { p.setVolume(v, v) }
                     if (f >= 1f) break

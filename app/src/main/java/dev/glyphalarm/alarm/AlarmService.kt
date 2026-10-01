@@ -23,6 +23,7 @@ import dev.glyphalarm.data.AppSettings
 import dev.glyphalarm.data.TimerItem
 import dev.glyphalarm.data.TimerRepo
 import dev.glyphalarm.data.TimerState
+import dev.glyphalarm.data.tr
 
 /**
  * Foreground service that keeps an alarm or a finished timer alive and audible while the ringing screen is shown.
@@ -53,15 +54,15 @@ class AlarmService : Service() {
         )
         val n: Notification = NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_alarm)
-            .setContentTitle(alarm.label.ifBlank { if (isTimer) "Таймер" else "Будильник" })
-            .setContentText(if (isTimer) "Время вышло" else "%02d:%02d".format(alarm.hour, alarm.minute))
+            .setContentTitle(alarm.label.ifBlank { if (isTimer) tr("Таймер", "Timer") else tr("Будильник", "Alarm") })
+            .setContentText(if (isTimer) tr("Время вышло", "Time is up") else "%02d:%02d".format(alarm.hour, alarm.minute))
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setOngoing(true)
             .setContentIntent(openScreen)
             .setFullScreenIntent(openScreen, true)
-            .addAction(0, if (isTimer) "+1 МИН" else "ОТЛОЖИТЬ", actionPi(ACTION_SNOOZE, 2))
-            .addAction(0, "СТОП", actionPi(ACTION_DISMISS, 3))
+            .addAction(0, if (isTimer) tr("+1 МИН", "+1 MIN") else tr("ОТЛОЖИТЬ", "SNOOZE"), actionPi(ACTION_SNOOZE, 2))
+            .addAction(0, tr("СТОП", "STOP"), actionPi(ACTION_DISMISS, 3))
             .build()
         ServiceCompat.startForeground(this, NOTIFICATION_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
 
@@ -86,8 +87,8 @@ class AlarmService : Service() {
         val t = TimerRepo.get(this, id - TimerRepo.ID_BASE) ?: return null
         val s = AppSettings.timerSoundNow(this)
         return Alarm(
-            id = id, hour = 0, minute = 0, label = t.label.ifBlank { "Таймер" },
-            soundPath = s.path, soundName = s.name, vibrate = true, rise = false, snoozeMin = 1,
+            id = id, hour = 0, minute = 0, label = t.label.ifBlank { tr("Таймер", "Timer") },
+            soundPath = s.path, soundName = s.title(), vibrate = true, rise = false, snoozeMin = 1,
         )
     }
 
@@ -134,7 +135,7 @@ class AlarmService : Service() {
         val nm = getSystemService(NotificationManager::class.java)
         if (nm.getNotificationChannel(CHANNEL) == null) {
             nm.createNotificationChannel(
-                NotificationChannel(CHANNEL, "Сработавший будильник", NotificationManager.IMPORTANCE_HIGH).apply {
+                NotificationChannel(CHANNEL, tr("Сработавший будильник", "Ringing alarm"), NotificationManager.IMPORTANCE_HIGH).apply {
                     setSound(null, null)
                     enableVibration(false)
                     lockscreenVisibility = Notification.VISIBILITY_PUBLIC

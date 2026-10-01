@@ -45,7 +45,8 @@ import dev.glyphalarm.data.StopwatchRepo
 import dev.glyphalarm.data.TimerRepo
 import dev.glyphalarm.data.WorldRepo
 import dev.glyphalarm.glyph.GlyphEngine
-import dev.glyphalarm.ui.AlarmEditorScreen
+import dev.glyphalarm.ui.AlarmSheet
+import dev.glyphalarm.data.tr
 import dev.glyphalarm.ui.AlarmsScreen
 import dev.glyphalarm.ui.AmbientBackground
 import dev.glyphalarm.ui.GlyphTheme
@@ -129,10 +130,6 @@ private fun App() {
 
     AmbientBackground {
         when (overlay) {
-            ALARM_EDIT -> AlarmEditorScreen(editId, onClose = { overlay = NONE }, onDeleted = {
-                deleted?.let { old -> SoundImporter.discard(old.soundPath) }
-                deleted = it
-            })
             SETTINGS -> SettingsScreen(setup) { overlay = NONE }
             else -> Box(Modifier.fillMaxSize()) {
                 Crossfade(tab, animationSpec = tween(220), label = "tab") { t ->
@@ -143,6 +140,10 @@ private fun App() {
                         else -> StopwatchScreen(onSettings = { overlay = SETTINGS })
                     }
                 }
+                if (overlay == ALARM_EDIT) AlarmSheet(editId, onClose = { overlay = NONE }, onDeleted = {
+                    deleted?.let { old -> SoundImporter.discard(old.soundPath) }
+                    deleted = it
+                })
                 val hideBar = tab == 1 && addingCity
                 if (!hideBar) {
                     val plus: (() -> Unit)? = when (tab) {
@@ -161,7 +162,7 @@ private fun App() {
                         exit = fadeOut(tweenSpec(180)) + slideOutVertically(tweenSpec(180)) { it / 2 },
                     ) {
                         val d = deleted
-                        UndoBar("Будильник удалён", "Вернуть", {
+                        UndoBar(tr("Будильник удалён", "Alarm deleted"), tr("Вернуть", "Undo"), {
                             if (d != null) {
                                 AlarmRepo.upsert(ctx, d)
                                 if (d.enabled) AlarmScheduler.schedule(ctx, d)

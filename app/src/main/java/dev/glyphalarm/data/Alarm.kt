@@ -18,13 +18,18 @@ data class Alarm(
     val label: String = "",
     /** Private copy of the picked sound. null = the phone's default alarm sound. */
     val soundPath: String? = null,
-    val soundName: String = "Стандартный сигнал",
+    val soundName: String = "",
+    /** Where the sound came from in the system picker; lets the picker tick the current choice. */
+    val soundUri: String? = null,
     val vibrate: Boolean = true,
     /** Volume and glyph intensity climb gradually. */
     val rise: Boolean = true,
     val snoozeMin: Int = 10,
 ) {
     fun repeatsOn(dayIndex: Int) = days and (1 shl dayIndex) != 0
+
+    /** Name shown for the melody. */
+    fun soundTitle(): String = if (soundPath == null || soundName.isBlank()) tr("Стандартный сигнал", "Default alarm") else soundName
 
     fun nextTrigger(now: ZonedDateTime = ZonedDateTime.now()): ZonedDateTime {
         var c = now.withHour(hour).withMinute(minute).withSecond(0).withNano(0)
@@ -37,7 +42,7 @@ data class Alarm(
     fun toJson() = JSONObject().apply {
         put("id", id); put("hour", hour); put("minute", minute); put("days", days)
         put("enabled", enabled); put("label", label)
-        put("soundPath", soundPath ?: JSONObject.NULL); put("soundName", soundName)
+        put("soundPath", soundPath ?: JSONObject.NULL); put("soundName", soundName); put("soundUri", soundUri ?: JSONObject.NULL)
         put("vibrate", vibrate); put("rise", rise); put("snoozeMin", snoozeMin)
     }
 
@@ -50,7 +55,8 @@ data class Alarm(
             enabled = o.optBoolean("enabled", true),
             label = o.optString("label", ""),
             soundPath = if (o.isNull("soundPath")) null else o.getString("soundPath"),
-            soundName = o.optString("soundName", "Стандартный сигнал"),
+            soundName = o.optString("soundName", "").let { if (it == "Стандартный сигнал") "" else it },
+            soundUri = if (o.isNull("soundUri")) null else o.optString("soundUri").ifBlank { null },
             vibrate = o.optBoolean("vibrate", true),
             rise = o.optBoolean("rise", true),
             snoozeMin = o.optInt("snoozeMin", 10),

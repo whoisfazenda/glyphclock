@@ -1,5 +1,6 @@
 package dev.glyphalarm.ui
 
+import dev.glyphalarm.data.tr
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -90,7 +91,7 @@ fun TimerScreen(creating: Boolean, onCreating: (Boolean) -> Unit, onSettings: ()
     }
 
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
-        ScreenTitle("Таймер") { NIconButton(Ic.GEAR, onSettings) }
+        ScreenTitle(tr("Таймер", "Timer")) { NIconButton(Ic.GEAR, onSettings) }
         LazyColumn(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = navBarClearance() + 16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -123,9 +124,9 @@ private fun TimerCard(t: TimerItem, tick: Long, modifier: Modifier, start: (Time
         }
         Spacer(Modifier.width(18.dp))
         Column(Modifier.weight(1f)) {
-            NCaps(if (running) "Идёт" else if (left == 0L) "Завершён" else "Пауза", color = if (running) n.display else n.secondary)
+            NCaps(if (running) tr("Идёт", "Running") else if (left == 0L) tr("Завершён", "Finished") else tr("Пауза", "Paused"), color = if (running) n.display else n.secondary)
             Spacer(Modifier.height(4.dp))
-            NMeta("из ${formatDuration(t.totalMs)}")
+            NMeta(tr("из ", "of ") + formatDuration(t.totalMs))
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                 CircleButton(
@@ -180,7 +181,7 @@ private fun TimerCreator(canCancel: Boolean, onCancel: () -> Unit, onSettings: (
 
     BackHandler(enabled = canCancel) { onCancel() }
     Column(Modifier.fillMaxSize().statusBarsPadding(), horizontalAlignment = Alignment.CenterHorizontally) {
-        ScreenTitle(if (canCancel) "Новый таймер" else "Таймер") {
+        ScreenTitle(if (canCancel) tr("Новый таймер", "New timer") else tr("Таймер", "Timer")) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (canCancel) NIconButton(Ic.CLOSE, onCancel)
                 NIconButton(Ic.GEAR, onSettings)
@@ -188,15 +189,15 @@ private fun TimerCreator(canCancel: Boolean, onCancel: () -> Unit, onSettings: (
         }
         Spacer(Modifier.weight(0.6f))
         Row(verticalAlignment = Alignment.Bottom) {
-            UnitBlock("%02d".format(h), "ч", lit = h > 0)
+            UnitBlock("%02d".format(h), tr("ч", "h"), lit = h > 0)
             Spacer(Modifier.width(14.dp))
-            UnitBlock("%02d".format(m), "м", lit = h > 0 || m > 0)
+            UnitBlock("%02d".format(m), tr("м", "m"), lit = h > 0 || m > 0)
             Spacer(Modifier.width(14.dp))
-            UnitBlock("%02d".format(s), "с", lit = totalMs > 0)
+            UnitBlock("%02d".format(s), tr("с", "s"), lit = totalMs > 0)
         }
         Spacer(Modifier.height(18.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(1 to "1 мин", 5 to "5 мин", 10 to "10 мин", 30 to "30 мин").forEach { (min, label) ->
+            listOf(1 to tr("1 мин", "1 min"), 5 to tr("5 мин", "5 min"), 10 to tr("10 мин", "10 min"), 30 to tr("30 мин", "30 min")).forEach { (min, label) ->
                 Box(Modifier.nCard(999.dp).clickable { tap(); onStart(min * 60_000L) }.padding(horizontal = 16.dp, vertical = 10.dp)) {
                     NText(label, style = NType.meta, color = n.primary)
                 }

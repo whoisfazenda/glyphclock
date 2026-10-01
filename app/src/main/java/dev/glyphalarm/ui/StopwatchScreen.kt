@@ -1,5 +1,6 @@
 package dev.glyphalarm.ui
 
+import dev.glyphalarm.data.tr
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -59,7 +60,7 @@ fun StopwatchScreen(onSettings: () -> Unit) {
     val worst = sw.laps.takeIf { it.size >= 2 }?.maxByOrNull { it.lapMs }?.number
 
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
-        ScreenTitle("Секундомер") { NIconButton(Ic.GEAR, onSettings) }
+        ScreenTitle(tr("Секундомер", "Stopwatch")) { NIconButton(Ic.GEAR, onSettings) }
 
         // the time: dot-matrix, centred
         Column(Modifier.fillMaxWidth().padding(top = if (sw.laps.isEmpty()) 56.dp else 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -70,10 +71,10 @@ fun StopwatchScreen(onSettings: () -> Unit) {
             Spacer(Modifier.height(8.dp))
             NCaps(
                 when {
-                    sw.laps.isNotEmpty() -> "Круг ${sw.laps.size + 1} · ${stopwatchText(lapMs)}"
-                    sw.running -> "Идёт"
-                    elapsed > 0 -> "Пауза"
-                    else -> "Готов"
+                    sw.laps.isNotEmpty() -> tr("Круг ", "Lap ") + "${sw.laps.size + 1} · ${stopwatchText(lapMs)}"
+                    sw.running -> tr("Идёт", "Running")
+                    elapsed > 0 -> tr("Пауза", "Paused")
+                    else -> tr("Готов", "Ready")
                 },
                 color = if (sw.running) n.primary else n.secondary,
             )

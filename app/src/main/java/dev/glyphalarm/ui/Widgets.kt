@@ -1,5 +1,6 @@
 package dev.glyphalarm.ui
 
+import dev.glyphalarm.data.tr
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
@@ -26,6 +27,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -110,7 +115,7 @@ fun ToggleRow(text: String, on: Boolean, subtitle: String? = null, onChange: (Bo
 
 // ---- floating bottom bar ----------------------------------------------------------------------
 
-private val TABS = listOf(Ic.ALARM to "Будильник", Ic.WORLD to "Мир", Ic.TIMER to "Таймер", Ic.STOPWATCH to "Секундомер")
+
 
 /** Height the bar takes above the system navigation inset; lists add it to their bottom padding. */
 val NavBarSpace = 96.dp
@@ -120,13 +125,36 @@ val NavBarSpace = 96.dp
 fun NavBar(selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier, onPlus: (() -> Unit)? = null) {
     val n = LocalN.current
     val tap = rememberTap()
+    val TABS = listOf(Ic.ALARM to tr("Будильник", "Alarm"), Ic.WORLD to tr("Мир", "World"), Ic.TIMER to tr("Таймер", "Timer"), Ic.STOPWATCH to tr("Секундомер", "Stopwatch"))
     Box(modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Transparent, n.bg.copy(alpha = 0.92f), n.bg)))) {
         Row(
             Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // the pill reacts to a touch and to a swipe: the tab under the finger is the selected one
+            val sel by rememberUpdatedState(selected)
+            val pick by rememberUpdatedState(onSelect)
             Row(
-                Modifier.weight(1f).height(64.dp).clip(CircleShape).background(n.surface, CircleShape).border(1.dp, n.border, CircleShape).padding(6.dp).animateContentSize(tween(180)),
+                Modifier
+                    .weight(1f).height(64.dp).clip(CircleShape).background(n.surface, CircleShape).border(1.dp, n.border, CircleShape)
+                    .pointerInput(Unit) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown()
+                            fun at(x: Float) {
+                                val i = ((x - 6.dp.toPx()) / ((size.width - 12.dp.toPx()) / TABS.size)).toInt().coerceIn(0, TABS.size - 1)
+                                if (i != sel) { tap(); pick(i) }
+                            }
+                            at(down.position.x)
+                            while (true) {
+                                val ev = awaitPointerEvent()
+                                val ch = ev.changes.firstOrNull() ?: break
+                                if (!ch.pressed) break
+                                at(ch.position.x)
+                                ch.consume()
+                            }
+                        }
+                    }
+                    .padding(6.dp).animateContentSize(tween(180)),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 TABS.forEachIndexed { i, (ic, label) ->
@@ -138,7 +166,6 @@ fun NavBar(selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier
                             .fillMaxHeight()
                             .clip(CircleShape)
                             .background(bg, CircleShape)
-                            .clickable(remember { MutableInteractionSource() }, null) { if (!on) { tap(); onSelect(i) } }
                             .padding(horizontal = if (on) 16.dp else 0.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center,

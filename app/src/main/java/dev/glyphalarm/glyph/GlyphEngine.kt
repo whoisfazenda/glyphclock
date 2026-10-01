@@ -9,6 +9,7 @@ import android.util.Log
 import com.nothing.ketchum.Glyph
 import com.nothing.ketchum.GlyphManager
 import dev.glyphalarm.alarm.AlarmEngine
+import dev.glyphalarm.data.tr
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -41,7 +42,7 @@ object GlyphEngine {
     @Volatile private var frameColorsBroken = false
     @Volatile private var frames = 0L
 
-    private val _status = MutableStateFlow(GlyphStatus(false, "Не запущено"))
+    private val _status = MutableStateFlow(GlyphStatus(false, tr("Не запущено", "Not started")))
     val status: StateFlow<GlyphStatus> = _status.asStateFlow()
 
     private val _monitor = MutableStateFlow(IntArray(N))
@@ -56,22 +57,22 @@ object GlyphEngine {
             try {
                 val registered = gm?.register(Glyph.DEVICE_24111) ?: false
                 if (!registered) {
-                    _status.value = GlyphStatus(false, "Служба найдена, но регистрация для Phone (3a) отклонена ($deviceInfo). Включите Glyph-интерфейс и режим отладки (см. ниже).")
+                    _status.value = GlyphStatus(false, tr("Служба найдена, но регистрация для Phone (3a) отклонена ($deviceInfo). Включите Glyph-интерфейс и режим отладки (см. ниже).", "Service found, but registration for Phone (3a) was refused ($deviceInfo). Turn on the Glyph interface and debug mode (see below)."))
                     return
                 }
                 gm?.openSession()
                 session = true
-                _status.value = GlyphStatus(true, "Подключено к Glyph-интерфейсу")
+                _status.value = GlyphStatus(true, tr("Подключено к Glyph-интерфейсу", "Connected to the Glyph interface"))
             } catch (t: Throwable) {
                 Log.w(TAG, "openSession failed", t)
                 session = false
-                _status.value = GlyphStatus(false, "Ошибка сеанса: ${t.message ?: t.javaClass.simpleName}")
+                _status.value = GlyphStatus(false, tr("Ошибка сеанса: ", "Session error: ") + "${t.message ?: t.javaClass.simpleName}")
             }
         }
 
         override fun onServiceDisconnected(componentName: ComponentName?) {
             session = false
-            _status.value = GlyphStatus(false, "Glyph-служба отключилась")
+            _status.value = GlyphStatus(false, tr("Glyph-служба отключилась", "The Glyph service disconnected"))
         }
     }
 
@@ -79,7 +80,7 @@ object GlyphEngine {
         if (!session) {
             _status.value = GlyphStatus(
                 false,
-                "Glyph-служба не отвечает. Убедитесь, что это телефон Nothing и Glyph-интерфейс включён; если не помогает — включите режим отладки по USB (см. ниже).",
+                tr("Glyph-служба не отвечает. Убедитесь, что это телефон Nothing и Glyph-интерфейс включён; если не помогает — включите режим отладки по USB (см. ниже).", "The Glyph service is not answering. Make sure this is a Nothing phone with the Glyph interface on; if that does not help, enable USB debug mode (see below)."),
             )
         }
     }
@@ -88,14 +89,14 @@ object GlyphEngine {
     fun attach(ctx: Context) {
         if (refs++ > 0) return
         frameColorsBroken = false
-        _status.value = GlyphStatus(false, "Подключение…")
+        _status.value = GlyphStatus(false, tr("Подключение…", "Connecting…"))
         try {
             gm = GlyphManager.getInstance(ctx.applicationContext)
             gm?.init(callback)
             main.postDelayed(bindTimeout, 4000)
         } catch (t: Throwable) {
             Log.w(TAG, "Glyph service not available", t)
-            _status.value = GlyphStatus(false, "Ошибка Glyph SDK: ${t.message ?: t.javaClass.simpleName}")
+            _status.value = GlyphStatus(false, tr("Ошибка Glyph SDK: ", "Glyph SDK error: ") + "${t.message ?: t.javaClass.simpleName}")
         }
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Default).also { it.launch { loop() } }
     }
@@ -114,21 +115,21 @@ object GlyphEngine {
             Log.w(TAG, "release failed", t)
         }
         session = false
-        _status.value = GlyphStatus(false, "Не запущено")
+        _status.value = GlyphStatus(false, tr("Не запущено", "Not started"))
         _monitor.value = IntArray(N)
     }
 
     /** One breathing flash of every glyph through the plain, documented kit API, to prove the link works. */
     fun selfTest(): String {
-        val m = gm ?: return "Glyph SDK не запущен"
-        if (!session) return "Нет сеанса: ${_status.value.text}"
+        val m = gm ?: return tr("Glyph SDK не запущен", "Glyph SDK is not running")
+        if (!session) return tr("Нет сеанса: ", "No session: ") + _status.value.text
         return try {
             val frame = m.getGlyphFrameBuilder().buildChannelA().buildChannelB().buildChannelC()
                 .buildPeriod(1600).buildCycles(2).buildInterval(10).build()
             m.animate(frame)
-            "Отправлено. Глифы должны дважды плавно загореться."
+            tr("Отправлено. Глифы должны дважды плавно загореться.", "Sent. The glyphs should glow softly twice.")
         } catch (t: Throwable) {
-            "Проверка не удалась: ${t.message ?: t.javaClass.simpleName}"
+            tr("Проверка не удалась: ", "Test failed: ") + "${t.message ?: t.javaClass.simpleName}"
         }
     }
 

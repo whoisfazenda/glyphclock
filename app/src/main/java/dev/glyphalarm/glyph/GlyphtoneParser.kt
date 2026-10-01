@@ -35,6 +35,9 @@ object GlyphLayout {
  */
 object GlyphtoneParser {
 
+    /** All comment tags of an Ogg file (keys upper-cased); empty when unreadable. */
+    fun tags(bytes: ByteArray): Map<String, String> = runCatching { readComments(bytes) }.getOrNull().orEmpty()
+
     fun parseFile(file: File): GlyphTrack? = runCatching { parse(file.readBytes()) }.getOrNull()
 
     fun parse(bytes: ByteArray): GlyphTrack? = try {

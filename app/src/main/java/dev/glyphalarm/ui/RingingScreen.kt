@@ -1,5 +1,6 @@
 package dev.glyphalarm.ui
 
+import dev.glyphalarm.data.tr
 import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -61,18 +62,18 @@ fun RingingScreen(onDone: () -> Unit) {
     val alarm = shown
     val isTimer = (alarm?.id ?: 0) >= TimerRepo.ID_BASE
     val (txt, suffix) = formatClock(clock.hour, clock.minute, is24)
-    val label = alarm?.label?.trim()?.takeIf { it.isNotEmpty() && !(isTimer && it == "Таймер") }
+    val label = alarm?.label?.trim()?.takeIf { it.isNotEmpty() && !(isTimer && (it == "Таймер" || it == "Timer")) }
 
     AmbientBackground {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 24.dp)) {
             Row(Modifier.fillMaxWidth().padding(top = 32.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(9.dp).background(if (blink) n.accent else n.bg, CircleShape))
                 Spacer(Modifier.width(12.dp))
-                NCaps(if (isTimer) "Таймер · время вышло" else "Будильник", color = n.primary)
+                NCaps(if (isTimer) tr("Таймер · время вышло", "Timer · time is up") else tr("Будильник", "Alarm"), color = n.primary)
             }
 
             Spacer(Modifier.height(28.dp))
-            Title(label ?: if (isTimer) "Время вышло" else "Пора вставать", style = NType.title, color = n.display)
+            Title(label ?: if (isTimer) tr("Время вышло", "Time is up") else tr("Пора вставать", "Wake up"), style = NType.title, color = n.display)
 
             Spacer(Modifier.height(28.dp))
             Row(verticalAlignment = Alignment.Bottom) {
@@ -85,13 +86,13 @@ fun RingingScreen(onDone: () -> Unit) {
             }
 
             NButton(
-                if (isTimer) "+1 мин" else "Отложить · ${alarm?.snoozeMin ?: 10} мин",
+                if (isTimer) tr("+1 мин", "+1 min") else tr("Отложить · ${alarm?.snoozeMin ?: 10} мин", "Snooze · ${alarm?.snoozeMin ?: 10} min"),
                 { ctx.startService(AlarmService.actionIntent(ctx, AlarmService.ACTION_SNOOZE)); onDone() },
                 Modifier.fillMaxWidth(), height = 58.dp,
             )
             Spacer(Modifier.height(12.dp))
             NButton(
-                "Стоп",
+                tr("Стоп", "Stop"),
                 { ctx.startService(AlarmService.actionIntent(ctx, AlarmService.ACTION_DISMISS)); onDone() },
                 Modifier.fillMaxWidth(), filled = true, height = 68.dp,
             )

@@ -87,7 +87,7 @@ fun NCaps(text: String, modifier: Modifier = Modifier, color: Color = LocalN.cur
 
 // ---- icons (monoline, round caps) --------------------------------------------------------------
 
-enum class Ic { ALARM, WORLD, TIMER, STOPWATCH, PLUS, BACK, GEAR, CLOSE, PLAY, PAUSE, RESET, LAP, BACKSPACE, TRASH, CHECK, MUSIC, CHEVRON }
+enum class Ic { ALARM, WORLD, TIMER, STOPWATCH, PLUS, BACK, GEAR, CLOSE, PLAY, PAUSE, RESET, LAP, BACKSPACE, TRASH, CHECK, MUSIC, CHEVRON, LABEL }
 
 @Composable
 fun NIcon(ic: Ic, modifier: Modifier = Modifier, tint: Color = LocalN.current.display, size: Dp = 24.dp) {
@@ -129,6 +129,7 @@ fun NIcon(ic: Ic, modifier: Modifier = Modifier, tint: Color = LocalN.current.di
             Ic.PLUS -> { line(12f, 5f, 12f, 19f); line(5f, 12f, 19f, 12f) }
             Ic.BACK -> { line(4.5f, 12f, 20f, 12f); poly(10.5f, 5.5f, 4f, 12f, 10.5f, 18.5f) }
             Ic.CHEVRON -> poly(9f, 5f, 16f, 12f, 9f, 19f)
+            Ic.LABEL -> { poly(4f, 6f, 14f, 6f, 20.5f, 12f, 14f, 18f, 4f, 18f, close = true); circle(9f, 12f, 1.3f, fill = true) }
             Ic.GEAR -> {
                 circle(12f, 12f, 3.2f); circle(12f, 12f, 7.4f)
                 for (k in 0 until 8) {
