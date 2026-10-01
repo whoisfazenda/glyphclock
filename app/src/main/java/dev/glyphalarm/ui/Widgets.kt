@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -31,6 +32,17 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.layout.offset
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -131,49 +143,62 @@ fun NavBar(selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier
             Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // the pill reacts to a touch and to a swipe: the tab under the finger is the selected one
-            val sel by rememberUpdatedState(selected)
+            // Fixed equal cells; a highlight follows the finger and the screen switches only when the finger lifts,
+            // so dragging never re-lays out or re-draws a whole screen.
+            val count = TABS.size
+            var raw by remember { mutableFloatStateOf(selected.toFloat()) }
+            LaunchedEffect(selected) { raw = selected.toFloat() }
+            val pos = animateFloatAsState(raw, spring(dampingRatio = 0.85f, stiffness = 700f), label = "tabpos")
+            val nearest by remember { derivedStateOf { pos.value.roundToInt().coerceIn(0, count - 1) } }
             val pick by rememberUpdatedState(onSelect)
-            Row(
+            val sel by rememberUpdatedState(selected)
+            var cellPx by remember { mutableFloatStateOf(0f) }
+            val density = LocalDensity.current
+
+            Box(
                 Modifier
-                    .weight(1f).height(64.dp).clip(CircleShape).background(n.surface, CircleShape).border(1.dp, n.border, CircleShape)
+                    .weight(1f).height(68.dp).clip(CircleShape).background(n.surface, CircleShape).border(1.dp, n.border, CircleShape)
+                    .padding(6.dp)
+                    .onSizeChanged { cellPx = it.width / count.toFloat() }
                     .pointerInput(Unit) {
                         awaitEachGesture {
                             val down = awaitFirstDown()
-                            fun at(x: Float) {
-                                val i = ((x - 6.dp.toPx()) / ((size.width - 12.dp.toPx()) / TABS.size)).toInt().coerceIn(0, TABS.size - 1)
-                                if (i != sel) { tap(); pick(i) }
-                            }
-                            at(down.position.x)
+                            fun fraction(x: Float) = (x / (size.width / count.toFloat()) - 0.5f).coerceIn(0f, (count - 1).toFloat())
+                            var last = Math.round(fraction(down.position.x))
+                            raw = fraction(down.position.x).let { Math.round(it).toFloat() }
+                            if (last != sel) tap()
+                            var moved = false
                             while (true) {
                                 val ev = awaitPointerEvent()
                                 val ch = ev.changes.firstOrNull() ?: break
                                 if (!ch.pressed) break
-                                at(ch.position.x)
+                                moved = true
+                                val f = fraction(ch.position.x)
+                                raw = f
+                                val r = Math.round(f)
+                                if (r != last) { last = r; tap() }
                                 ch.consume()
                             }
+                            val target = if (moved) Math.round(raw) else last
+                            raw = target.toFloat()
+                            if (target != sel) pick(target)
                         }
-                    }
-                    .padding(6.dp).animateContentSize(tween(180)),
-                verticalAlignment = Alignment.CenterVertically,
+                    },
             ) {
-                TABS.forEachIndexed { i, (ic, label) ->
-                    val on = i == selected
-                    val bg by animateColorAsState(if (on) n.surfaceRaised else Color.Transparent, tween(180), label = "tab")
-                    Row(
-                        Modifier
-                            .then(if (on) Modifier else Modifier.weight(1f))
-                            .fillMaxHeight()
-                            .clip(CircleShape)
-                            .background(bg, CircleShape)
-                            .padding(horizontal = if (on) 16.dp else 0.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center,
-                    ) {
-                        NIcon(ic, tint = if (on) n.display else n.secondary, size = 22.dp)
-                        if (on) {
-                            Spacer(Modifier.width(8.dp))
-                            Text(label, color = n.display, style = NType.bodyMedium.copy(fontSize = 14.sp), maxLines = 1, softWrap = false)
+                Box(
+                    Modifier
+                        .offset { IntOffset((pos.value * cellPx).roundToInt(), 0) }
+                        .width(with(density) { cellPx.toDp() })
+                        .fillMaxHeight()
+                        .background(n.surfaceRaised, CircleShape),
+                )
+                Row(Modifier.fillMaxSize()) {
+                    TABS.forEachIndexed { i, (ic, label) ->
+                        val on = nearest == i
+                        Column(Modifier.weight(1f).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                            NIcon(ic, tint = if (on) n.display else n.secondary, size = 22.dp)
+                            Spacer(Modifier.height(3.dp))
+                            Text(label, color = if (on) n.display else n.secondary, style = NType.meta.copy(fontSize = 10.5.sp), maxLines = 1, softWrap = false)
                         }
                     }
                 }

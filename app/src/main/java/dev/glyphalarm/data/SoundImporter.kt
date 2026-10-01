@@ -84,6 +84,17 @@ object SoundImporter {
         ctx.contentResolver.query(uri, arrayOf(column), null, null, null)?.use { if (it.moveToFirst()) it.getString(0) else null }
     }.getOrNull()
 
+    /** Gives a new alarm its own copy of the default melody, so changing or deleting the alarm never touches the default. */
+    fun duplicate(ctx: Context, s: TimerSound): ImportedSound? {
+        val src = s.path?.let(::File)?.takeIf { it.exists() } ?: return null
+        return runCatching {
+            val dir = File(ctx.filesDir, "sounds").apply { mkdirs() }
+            val out = File(dir, "${UUID.randomUUID()}.${src.extension.ifBlank { "ogg" }}")
+            src.copyTo(out)
+            ImportedSound(out.absolutePath, s.name, s.uri.orEmpty())
+        }.getOrNull()
+    }
+
     /** Removes the private copy when an alarm stops using it. */
     fun discard(path: String?) {
         if (path != null) runCatching { File(path).delete() }

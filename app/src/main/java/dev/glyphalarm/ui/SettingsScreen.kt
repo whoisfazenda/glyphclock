@@ -118,6 +118,17 @@ fun SettingsScreen(items: List<SetupItem>, onClose: () -> Unit) {
     var helpOpen by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     var soundError by remember { mutableStateOf<String?>(null) }
+    val alarmSound by AppSettings.alarmSound.collectAsStateWithLifecycle()
+    var alarmError by remember { mutableStateOf<String?>(null) }
+    val openAlarmPicker = rememberSystemRingtonePicker(alarmSound.uri) { uri ->
+        scope.launch {
+            val snd = withContext(Dispatchers.IO) { SoundImporter.import(ctx, uri) }
+            if (snd == null) { alarmError = tr("Не удалось открыть эту мелодию", "Could not open this melody"); return@launch }
+            alarmError = null
+            alarmSound.path?.let { SoundImporter.discard(it) }
+            AppSettings.setAlarmSound(ctx, TimerSound(snd.path, snd.name, snd.uri))
+        }
+    }
     val openSystemPicker = rememberSystemRingtonePicker(timerSound.uri) { uri ->
         scope.launch {
             val snd = withContext(Dispatchers.IO) { SoundImporter.import(ctx, uri) }
@@ -142,7 +153,7 @@ fun SettingsScreen(items: List<SetupItem>, onClose: () -> Unit) {
             Spacer(Modifier.height(8.dp))
             Title(tr("Настройки", "Settings"), Modifier.padding(horizontal = 8.dp))
 
-            NSection(tr("Звук будильника", "Alarm sound"))
+            NSection(tr("Звук", "Sound"))
             NGroup {
                 Column(Modifier.nRow().padding(start = 20.dp, end = 12.dp, top = 16.dp, bottom = 8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -165,6 +176,14 @@ fun SettingsScreen(items: List<SetupItem>, onClose: () -> Unit) {
                     }
                     NSlider(riseSec.toFloat(), 5f..120f, 22, { AppSettings.setRiseSec(ctx, ((it / 5f).toInt() * 5).coerceAtLeast(5)) })
                 }
+                NRow(tr("Мелодия будильника по умолчанию", "Default alarm melody"), leading = Ic.ALARM, subtitle = alarmError ?: alarmSound.title(), onClick = openAlarmPicker) {
+                    NIcon(Ic.CHEVRON, tint = n.disabled, size = 18.dp)
+                }
+                if (alarmSound.path != null) NRow(tr("Вернуть стандартный сигнал", "Back to the default alarm sound"), titleColor = n.secondary, onClick = {
+                    SoundImporter.discard(alarmSound.path)
+                    alarmError = null
+                    AppSettings.setAlarmSound(ctx, TimerSound(null, "", null))
+                })
                 NRow(tr("Мелодия таймера", "Timer sound"), leading = Ic.MUSIC, subtitle = soundError ?: timerSound.title(), onClick = openSystemPicker) {
                     NIcon(Ic.CHEVRON, tint = n.disabled, size = 18.dp)
                 }

@@ -70,6 +70,7 @@ class MainActivity : ComponentActivity() {
         Thread {
             val keep = AlarmRepo.all(this).mapNotNull { it.soundPath }.toMutableSet()
             AppSettings.timerSoundNow(this).path?.let { keep += it }
+            AppSettings.alarmSoundNow(this).path?.let { keep += it }
             SoundImporter.sweep(this, keep)
         }.start()
         setContent { GlyphTheme { App() } }

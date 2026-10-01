@@ -26,6 +26,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import dev.glyphalarm.data.AppSettings
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -87,6 +89,14 @@ fun AlarmSheet(alarmId: Int, onClose: () -> Unit, onDeleted: (Alarm) -> Unit) {
     var picker by remember { mutableIntStateOf(if (original == null) 0 else -1) }
     var timeConfirmed by remember { mutableStateOf(original != null) }
     val pickedFiles = remember { mutableStateListOf<String>() }
+
+    // a new alarm starts with the melody chosen in Settings
+    LaunchedEffect(Unit) {
+        if (original != null) return@LaunchedEffect
+        val snd = withContext(Dispatchers.IO) { SoundImporter.duplicate(ctx, AppSettings.alarmSoundNow(ctx)) } ?: return@LaunchedEffect
+        pickedFiles.add(snd.path)
+        draft = draft.copy(soundPath = snd.path, soundName = snd.name, soundUri = snd.uri.ifBlank { null })
+    }
 
     val ringing by AlarmEngine.ringing.collectAsStateWithLifecycle()
     val previewing = ringing?.preview == true

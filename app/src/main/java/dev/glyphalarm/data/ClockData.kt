@@ -237,6 +237,9 @@ object AppSettings {
     val timerSound: StateFlow<TimerSound> = _timerSound.asStateFlow()
     private val _offset = MutableStateFlow(0)
     val syncOffsetMs: StateFlow<Int> = _offset.asStateFlow()
+    private val _alarmSound = MutableStateFlow(TimerSound(null, ""))
+    /** Melody given to every new alarm; null path = the phone's own alarm tone. */
+    val alarmSound: StateFlow<TimerSound> = _alarmSound.asStateFlow()
     private val _riseSec = MutableStateFlow(30)
     /** How long the volume (and the glyph intensity) takes to climb to the top. */
     val riseSec: StateFlow<Int> = _riseSec.asStateFlow()
@@ -252,6 +255,7 @@ object AppSettings {
             (p.getString("timer_name", "") ?: "").let { if (it == "Стандартный сигнал") "" else it },
             p.getString("timer_uri", null),
         )
+        _alarmSound.value = TimerSound(p.getString("alarm_path", null), p.getString("alarm_name", "") ?: "", p.getString("alarm_uri", null))
         _riseSec.value = p.getInt("rise_sec", 30)
         loaded = true
     }
@@ -269,6 +273,14 @@ object AppSettings {
         ensure(ctx)
         _riseSec.value = sec.coerceIn(5, 120)
         prefs(ctx).edit().putInt("rise_sec", _riseSec.value).apply()
+    }
+
+    fun alarmSoundNow(ctx: Context): TimerSound { ensure(ctx); return _alarmSound.value }
+
+    fun setAlarmSound(ctx: Context, s: TimerSound) {
+        ensure(ctx)
+        _alarmSound.value = s
+        prefs(ctx).edit().putString("alarm_path", s.path).putString("alarm_name", s.name).putString("alarm_uri", s.uri).apply()
     }
 
     fun setTimerSound(ctx: Context, s: TimerSound) {

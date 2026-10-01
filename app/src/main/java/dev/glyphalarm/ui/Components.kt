@@ -141,8 +141,9 @@ fun NIcon(ic: Ic, modifier: Modifier = Modifier, tint: Color = LocalN.current.di
             Ic.PLAY -> poly(8f, 5.2f, 18.6f, 12f, 8f, 18.8f, close = true, fill = true)
             Ic.PAUSE -> { line(9f, 5.5f, 9f, 18.5f); line(15f, 5.5f, 15f, 18.5f) }
             Ic.RESET -> {
-                drawArc(tint, -50f, 300f, false, p(4.6f, 4.6f), Size(14.8f * s, 14.8f * s), style = st)
-                poly(4.4f, 3.4f, 4.4f, 8f, 9f, 8f)
+                // counter-clockwise arrow: an open circle with the arrowhead in the upper left
+                drawArc(tint, 180f, -318f, false, p(3f, 3f), Size(18f * s, 18f * s), style = st)
+                poly(3.2f, 3.4f, 3.2f, 8.2f, 8f, 8.2f)
             }
             Ic.LAP -> { line(6f, 3.5f, 6f, 20.5f); poly(6f, 4.5f, 18f, 4.5f, 15f, 8.5f, 18f, 12.5f, 6f, 12.5f) }
             Ic.BACKSPACE -> {
@@ -175,6 +176,7 @@ private val DOT_FONT: Map<Char, List<String>> = mapOf(
     ':' to listOf("0", "0", "1", "0", "1", "0", "0"),
     '.' to listOf("0", "0", "0", "0", "0", "0", "1"),
     '-' to listOf("000", "000", "000", "111", "000", "000", "000"),
+    '+' to listOf("000", "010", "010", "111", "010", "010", "000"),
     ' ' to List(7) { "00" },
 )
 

@@ -3,6 +3,7 @@ package dev.glyphalarm.ui
 import dev.glyphalarm.data.tr
 import android.content.Context
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -72,17 +73,39 @@ fun RingingScreen(onDone: () -> Unit) {
                 NCaps(if (isTimer) tr("Таймер · время вышло", "Timer · time is up") else tr("Будильник", "Alarm"), color = n.primary)
             }
 
-            Spacer(Modifier.height(28.dp))
-            Title(label ?: if (isTimer) tr("Время вышло", "Time is up") else tr("Пора вставать", "Wake up"), style = NType.title, color = n.display)
+            if (isTimer) {
+                // a finished timer: zeros blinking in the middle, the overtime counting up, the glyphs below
+                val total = remember(alarm?.id) { alarm?.let { TimerRepo.get(ctx, it.id - TimerRepo.ID_BASE)?.totalMs } ?: 0L }
+                val since = remember { System.currentTimeMillis() }
+                var over by remember { mutableStateOf(0L) }
+                LaunchedEffect(Unit) { while (true) { over = (System.currentTimeMillis() - since) / 1000; delay(250) } }
+                Column(Modifier.weight(1f).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                    NCaps(tr("Таймер завершён", "Timer finished"), color = n.secondary)
+                    Spacer(Modifier.height(24.dp))
+                    DotText("00:00", color = if (blink) n.display else n.display.copy(alpha = 0.25f), maxPitch = 13.dp)
+                    Spacer(Modifier.height(22.dp))
+                    DotText("+%02d:%02d".format(over / 60, over % 60), color = n.secondary, maxPitch = 5.dp, showUnlit = false)
+                    if (total > 0) {
+                        Spacer(Modifier.height(18.dp))
+                        NMeta(tr("Таймер на ", "Timer for ") + formatDuration(total))
+                    }
+                }
+                Box(Modifier.fillMaxWidth().padding(bottom = 16.dp), contentAlignment = Alignment.Center) {
+                    GlyphPhone(frame, Modifier.width(190.dp))
+                }
+            } else {
+                Spacer(Modifier.height(28.dp))
+                Title(label ?: tr("Пора вставать", "Wake up"), style = NType.title, color = n.display)
 
-            Spacer(Modifier.height(28.dp))
-            Row(verticalAlignment = Alignment.Bottom) {
-                DotText(txt, Modifier.weight(1f, fill = false))
-                if (suffix.isNotEmpty()) { Spacer(Modifier.width(10.dp)); NText(suffix, style = NType.heading, color = n.secondary) }
-            }
+                Spacer(Modifier.height(28.dp))
+                Row(verticalAlignment = Alignment.Bottom) {
+                    DotText(txt, Modifier.weight(1f, fill = false))
+                    if (suffix.isNotEmpty()) { Spacer(Modifier.width(10.dp)); NText(suffix, style = NType.heading, color = n.secondary) }
+                }
 
-            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                GlyphPhone(frame, Modifier.widthIn(max = 250.dp).fillMaxWidth())
+                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    GlyphPhone(frame, Modifier.widthIn(max = 250.dp).fillMaxWidth())
+                }
             }
 
             NButton(
