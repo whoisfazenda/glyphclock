@@ -40,7 +40,11 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import android.view.HapticFeedbackConstants
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -62,14 +66,23 @@ fun NMeta(text: String, modifier: Modifier = Modifier, color: Color = LocalN.cur
 }
 
 @Composable
-fun NText(text: String, modifier: Modifier = Modifier, style: androidx.compose.ui.text.TextStyle = NType.body, color: Color = LocalN.current.display, align: TextAlign? = null) {
-    Text(text, modifier, color = color, style = style, textAlign = align)
+fun NText(
+    text: String, modifier: Modifier = Modifier, style: TextStyle = NType.body, color: Color = LocalN.current.display,
+    align: TextAlign? = null, maxLines: Int = Int.MAX_VALUE,
+) {
+    Text(text, modifier, color = color, style = style, textAlign = align, maxLines = maxLines, overflow = TextOverflow.Ellipsis)
 }
 
-/** Headline in the dot-matrix face, upper case. */
+/** Screen headline in the narrow serif. */
 @Composable
-fun DotTitle(text: String, modifier: Modifier = Modifier, style: androidx.compose.ui.text.TextStyle = NType.dotTitle, color: Color = LocalN.current.display) {
-    Text(text.uppercase(), modifier, color = color, style = style)
+fun Title(text: String, modifier: Modifier = Modifier, style: TextStyle = NType.title, color: Color = LocalN.current.display) {
+    Text(text, modifier, color = color, style = style)
+}
+
+/** Small upper-case caption in the dot-matrix face: section names, states. */
+@Composable
+fun NCaps(text: String, modifier: Modifier = Modifier, color: Color = LocalN.current.secondary) {
+    Text(text.uppercase(), modifier, color = color, style = NType.caps, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
 }
 
 // ---- icons (monoline, round caps) --------------------------------------------------------------
@@ -255,18 +268,33 @@ fun GlyphPhone(frame: IntArray, modifier: Modifier = Modifier) {
 
 // ---- controls --------------------------------------------------------------------------------
 
+/** Light "key press" vibration for buttons and switches. */
+@Composable
+fun rememberTap(): () -> Unit {
+    val v = LocalView.current
+    return remember(v) { { v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY) } }
+}
+
+/** Fine tick for the time dial. */
+@Composable
+fun rememberTick(): () -> Unit {
+    val v = LocalView.current
+    return remember(v) { { v.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK) } }
+}
+
 @Composable
 fun NSwitch(checked: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
     val n = LocalN.current
     val x by animateDpAsState(if (checked) 24.dp else 3.dp, tween(150), label = "x")
     val track by animateColorAsState(if (checked) n.display else n.surfaceRaised, tween(150), label = "track")
     val knob by animateColorAsState(if (checked) n.bg else n.secondary, tween(150), label = "knob")
+    val tap = rememberTap()
     Box(
         modifier
             .size(54.dp, 30.dp)
             .clip(CircleShape)
             .background(track, CircleShape)
-            .clickable(remember { MutableInteractionSource() }, null) { onChange(!checked) },
+            .clickable(remember { MutableInteractionSource() }, null) { tap(); onChange(!checked) },
     ) {
         Box(Modifier.offset(x, 0.dp).align(Alignment.CenterStart).size(24.dp).background(knob, CircleShape))
     }
@@ -285,6 +313,7 @@ fun NButton(
     val n = LocalN.current
     val shape = RoundedCornerShape(999.dp)
     val fg = when { danger && filled -> Color.White; danger -> n.accent; filled -> n.bg; else -> n.display }
+    val tap = rememberTap()
     Row(
         modifier
             .height(height)
@@ -296,13 +325,13 @@ fun NButton(
                     else -> Modifier.border(1.dp, if (danger) n.accent else n.borderVisible, shape)
                 },
             )
-            .clickable(onClick = onClick)
+            .clickable { tap(); onClick() }
             .padding(horizontal = 24.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
         if (icon != null) { NIcon(icon, tint = fg, size = 20.dp); Spacer(Modifier.width(8.dp)) }
-        Text(text, color = fg, style = NType.bodyMedium)
+        Text(text, color = fg, style = NType.bodyMedium, maxLines = 1, softWrap = false)
     }
 }
 
@@ -310,6 +339,7 @@ fun NButton(
 @Composable
 fun CircleButton(onClick: () -> Unit, modifier: Modifier = Modifier, size: Dp = 72.dp, filled: Boolean = false, danger: Boolean = false, content: @Composable () -> Unit) {
     val n = LocalN.current
+    val tap = rememberTap()
     Box(
         modifier
             .size(size)
@@ -321,7 +351,7 @@ fun CircleButton(onClick: () -> Unit, modifier: Modifier = Modifier, size: Dp = 
                     else -> Modifier.background(n.surface, CircleShape)
                 },
             )
-            .clickable(onClick = onClick),
+            .clickable { tap(); onClick() },
         contentAlignment = Alignment.Center,
     ) { content() }
 }
@@ -330,7 +360,8 @@ fun CircleButton(onClick: () -> Unit, modifier: Modifier = Modifier, size: Dp = 
 @Composable
 fun NSegmented(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
     val n = LocalN.current
-    Row(modifier.fillMaxWidth().nCard(999.dp).padding(4.dp)) {
+    val tap = rememberTap()
+    Row(modifier.fillMaxWidth().clip(CircleShape).background(n.bg, CircleShape).padding(4.dp)) {
         options.forEachIndexed { i, o ->
             val on = i == selected
             val bg by animateColorAsState(if (on) n.display else Color.Transparent, tween(140), label = "seg")
@@ -339,7 +370,7 @@ fun NSegmented(options: List<String>, selected: Int, onSelect: (Int) -> Unit, mo
                     .weight(1f)
                     .clip(RoundedCornerShape(999.dp))
                     .background(bg, RoundedCornerShape(999.dp))
-                    .clickable(remember { MutableInteractionSource() }, null) { onSelect(i) }
+                    .clickable(remember { MutableInteractionSource() }, null) { tap(); onSelect(i) }
                     .padding(vertical = 11.dp),
                 contentAlignment = Alignment.Center,
             ) { Text(o, color = if (on) n.bg else n.secondary, style = NType.meta.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium)) }
@@ -350,12 +381,13 @@ fun NSegmented(options: List<String>, selected: Int, onSelect: (Int) -> Unit, mo
 @Composable
 fun DayChip(letter: String, on: Boolean, onClick: () -> Unit) {
     val n = LocalN.current
+    val tap = rememberTap()
     Box(
         Modifier
             .size(40.dp)
             .clip(CircleShape)
             .then(if (on) Modifier.background(n.display, CircleShape) else Modifier.border(1.dp, n.borderVisible, CircleShape))
-            .clickable(onClick = onClick),
+            .clickable { tap(); onClick() },
         contentAlignment = Alignment.Center,
     ) { Text(letter, color = if (on) n.bg else n.secondary, style = NType.meta.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium)) }
 }
@@ -370,11 +402,11 @@ fun NCard(modifier: Modifier = Modifier, padding: Dp = 20.dp, content: @Composab
     Box(modifier.fillMaxWidth().nCard().padding(padding)) { content() }
 }
 
-/** Big dot-matrix headline with an optional action on the right, like every Nothing settings page. */
+/** Big headline with an optional action on the right, like every Nothing settings page. */
 @Composable
 fun ScreenTitle(title: String, modifier: Modifier = Modifier, trailing: @Composable () -> Unit = {}) {
-    Row(modifier.fillMaxWidth().padding(start = 24.dp, end = 12.dp, top = 28.dp, bottom = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-        DotTitle(title, Modifier.weight(1f))
+    Row(modifier.fillMaxWidth().padding(start = 24.dp, end = 12.dp, top = 28.dp, bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Title(title, Modifier.weight(1f))
         trailing()
     }
 }
@@ -394,34 +426,6 @@ fun TopBar(onBack: () -> Unit, modifier: Modifier = Modifier, trailing: @Composa
         NIconButton(Ic.BACK, onBack)
         Spacer(Modifier.weight(1f))
         trailing()
-    }
-}
-
-@Composable
-fun NavBar(selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
-    val n = LocalN.current
-    val items = listOf(Ic.ALARM to "Будильник", Ic.WORLD to "Мир", Ic.TIMER to "Таймер", Ic.STOPWATCH to "Секундомер")
-    Column(modifier.background(n.bg).navigationBarsPadding()) {
-        Hairline()
-        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp)) {
-            items.forEachIndexed { i, (ic, label) ->
-                val on = i == selected
-                Column(
-                    Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(16.dp))
-                        .clickable(remember { MutableInteractionSource() }, null) { onSelect(i) }
-                        .padding(vertical = 6.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    NIcon(ic, tint = if (on) n.display else n.disabled, size = 24.dp)
-                    Spacer(Modifier.height(3.dp))
-                    Text(label, color = if (on) n.display else n.disabled, style = NType.meta.copy(fontSize = 11.sp))
-                    Spacer(Modifier.height(4.dp))
-                    Box(Modifier.size(5.dp).background(if (on) n.accent else Color.Transparent, CircleShape))
-                }
-            }
-        }
     }
 }
 

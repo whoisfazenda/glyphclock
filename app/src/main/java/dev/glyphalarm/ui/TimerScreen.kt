@@ -1,5 +1,6 @@
 package dev.glyphalarm.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -56,10 +57,9 @@ fun formatDuration(ms: Long, roundUp: Boolean = true): String {
 }
 
 @Composable
-fun TimerScreen(onSettings: () -> Unit) {
+fun TimerScreen(creating: Boolean, onCreating: (Boolean) -> Unit, onSettings: () -> Unit) {
     val ctx = LocalContext.current
     val timers by TimerRepo.timers.collectAsStateWithLifecycle()
-    var creating by remember { mutableStateOf(TimerRepo.all(ctx).isEmpty()) }
     var tick by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) { while (true) { delay(200); tick = System.currentTimeMillis() } }
 
@@ -79,49 +79,36 @@ fun TimerScreen(onSettings: () -> Unit) {
     if (creating || timers.isEmpty()) {
         TimerCreator(
             canCancel = timers.isNotEmpty(),
-            onCancel = { creating = false },
+            onCancel = { onCreating(false) },
             onSettings = onSettings,
             onStart = { ms ->
                 start(TimerItem(TimerRepo.newId(ctx), ms, remainingMs = ms))
-                creating = false
+                onCreating(false)
             },
         )
         return
     }
 
-    val n = LocalN.current
-    Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize().statusBarsPadding()) {
-            ScreenTitle("Таймер") { NIconButton(Ic.GEAR, onSettings) }
-            LazyColumn(
-                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 190.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                items(timers, key = { it.id }) { t -> TimerCard(t, tick, ::start) }
-            }
+    Column(Modifier.fillMaxSize().statusBarsPadding()) {
+        ScreenTitle("Таймер") { NIconButton(Ic.GEAR, onSettings) }
+        LazyColumn(
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = navBarClearance() + 16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            items(timers, key = { it.id }) { t -> TimerCard(t, tick, Modifier.animateItem(), ::start) }
         }
-        Box(
-            Modifier
-                .align(Alignment.BottomEnd)
-                .navigationBarsPadding()
-                .padding(end = 24.dp, bottom = 100.dp)
-                .size(64.dp)
-                .background(n.display, CircleShape)
-                .clickable { creating = true },
-            contentAlignment = Alignment.Center,
-        ) { NIcon(Ic.PLUS, tint = n.bg, size = 28.dp) }
     }
 }
 
 @Composable
-private fun TimerCard(t: TimerItem, tick: Long, start: (TimerItem) -> Unit) {
+private fun TimerCard(t: TimerItem, tick: Long, modifier: Modifier, start: (TimerItem) -> Unit) {
     val n = LocalN.current
     val ctx = LocalContext.current
     val left = t.remaining(tick)
     val frac = if (t.totalMs == 0L) 0f else (left.toFloat() / t.totalMs).coerceIn(0f, 1f)
     val running = t.state == TimerState.RUNNING
 
-    Row(Modifier.fillMaxWidth().nCard(28.dp).padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier.fillMaxWidth().nCard(24.dp).padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(104.dp), contentAlignment = Alignment.Center) {
             val tint = n.display
             val track = n.display.copy(alpha = 0.10f)
@@ -136,7 +123,8 @@ private fun TimerCard(t: TimerItem, tick: Long, start: (TimerItem) -> Unit) {
         }
         Spacer(Modifier.width(18.dp))
         Column(Modifier.weight(1f)) {
-            NText(t.label.ifBlank { "Таймер" }, style = NType.bodyMedium)
+            NCaps(if (running) "Идёт" else if (left == 0L) "Завершён" else "Пауза", color = if (running) n.display else n.secondary)
+            Spacer(Modifier.height(4.dp))
             NMeta("из ${formatDuration(t.totalMs)}")
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -159,7 +147,7 @@ private fun TimerCard(t: TimerItem, tick: Long, start: (TimerItem) -> Unit) {
                         } else TimerRepo.upsert(ctx, t.copy(totalMs = t.totalMs + extra, remainingMs = t.remainingMs + extra))
                     },
                     size = 50.dp,
-                ) { Text("+1", style = NType.meta.copy(color = n.display)) }
+                ) { Text("+1", style = NType.bodyMedium.copy(fontSize = 14.sp, color = n.display)) }
                 CircleButton(
                     onClick = {
                         AlarmScheduler.cancelTimer(ctx, t.id)
@@ -179,6 +167,7 @@ private fun TimerCard(t: TimerItem, tick: Long, start: (TimerItem) -> Unit) {
 @Composable
 private fun TimerCreator(canCancel: Boolean, onCancel: () -> Unit, onSettings: () -> Unit, onStart: (Long) -> Unit) {
     val n = LocalN.current
+    val tap = rememberTap()
     var digits by remember { mutableStateOf("") } // up to 6 digits: HHMMSS, typed from the right like the stock Clock
 
     val padded = digits.padStart(6, '0')
@@ -189,14 +178,15 @@ private fun TimerCreator(canCancel: Boolean, onCancel: () -> Unit, onSettings: (
 
     fun press(d: String) { if ((digits + d).trimStart('0').length <= 6) digits = (digits + d).trimStart('0') }
 
+    BackHandler(enabled = canCancel) { onCancel() }
     Column(Modifier.fillMaxSize().statusBarsPadding(), horizontalAlignment = Alignment.CenterHorizontally) {
-        ScreenTitle("Таймер") {
+        ScreenTitle(if (canCancel) "Новый таймер" else "Таймер") {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (canCancel) NIconButton(Ic.CLOSE, onCancel)
                 NIconButton(Ic.GEAR, onSettings)
             }
         }
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.weight(0.6f))
         Row(verticalAlignment = Alignment.Bottom) {
             UnitBlock("%02d".format(h), "ч", lit = h > 0)
             Spacer(Modifier.width(14.dp))
@@ -204,33 +194,34 @@ private fun TimerCreator(canCancel: Boolean, onCancel: () -> Unit, onSettings: (
             Spacer(Modifier.width(14.dp))
             UnitBlock("%02d".format(s), "с", lit = totalMs > 0)
         }
-        Spacer(Modifier.height(20.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Spacer(Modifier.height(18.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf(1 to "1 мин", 5 to "5 мин", 10 to "10 мин", 30 to "30 мин").forEach { (min, label) ->
-                Box(Modifier.nCard(999.dp).clickable { onStart(min * 60_000L) }.padding(horizontal = 16.dp, vertical = 10.dp)) {
+                Box(Modifier.nCard(999.dp).clickable { tap(); onStart(min * 60_000L) }.padding(horizontal = 16.dp, vertical = 10.dp)) {
                     NText(label, style = NType.meta, color = n.primary)
                 }
             }
         }
         Spacer(Modifier.weight(1f))
 
-        Column(Modifier.padding(horizontal = 36.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        // number pad in the style of the Nothing dialler: round keys, the action in the last row
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             listOf(listOf("1", "2", "3"), listOf("4", "5", "6"), listOf("7", "8", "9")).forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) { row.forEach { KeyButton(it) { press(it) } } }
+                Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) { row.forEach { KeyButton(it) { press(it) } } }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                KeyButton("00") { press("00") }
+            Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                CircleButton({ digits = digits.dropLast(1) }, size = KEY) { NIcon(Ic.BACKSPACE, tint = if (digits.isEmpty()) n.disabled else n.display) }
                 KeyButton("0") { press("0") }
-                CircleButton({ digits = digits.dropLast(1) }, size = 80.dp) { NIcon(Ic.BACKSPACE, tint = n.secondary) }
+                CircleButton({ if (totalMs > 0) onStart(totalMs) }, size = KEY, filled = totalMs > 0) {
+                    NIcon(Ic.PLAY, tint = if (totalMs > 0) n.bg else n.disabled, size = 28.dp)
+                }
             }
         }
-        Spacer(Modifier.height(22.dp))
-        CircleButton({ if (totalMs > 0) onStart(totalMs) }, size = 76.dp, filled = totalMs > 0) {
-            NIcon(Ic.PLAY, tint = if (totalMs > 0) n.bg else n.disabled, size = 30.dp)
-        }
-        Spacer(Modifier.height(120.dp))
+        Spacer(Modifier.height(navBarClearance() + 12.dp))
     }
 }
+
+private val KEY = 76.dp
 
 @Composable
 private fun UnitBlock(value: String, unit: String, lit: Boolean) {
@@ -243,5 +234,5 @@ private fun UnitBlock(value: String, unit: String, lit: Boolean) {
 
 @Composable
 private fun KeyButton(label: String, onClick: () -> Unit) {
-    CircleButton(onClick, size = 80.dp) { Text(label, style = NType.dotNumber.copy(fontSize = 30.sp), color = LocalN.current.display) }
+    CircleButton(onClick, size = KEY) { Text(label, style = NType.key, color = LocalN.current.display) }
 }

@@ -10,7 +10,17 @@ import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -88,11 +98,12 @@ fun SettingsScreen(items: List<SetupItem>, onClose: () -> Unit) {
     val offset by AppSettings.syncOffsetMs.collectAsStateWithLifecycle()
     val timerSound by AppSettings.timerSound.collectAsStateWithLifecycle()
     var testResult by remember { mutableStateOf<String?>(null) }
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var helpOpen by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     var soundError by remember { mutableStateOf<String?>(null) }
     val openSystemPicker = rememberSystemRingtonePicker { uri ->
         scope.launch {
-            val snd = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { SoundImporter.import(ctx, uri) }
+            val snd = withContext(Dispatchers.IO) { SoundImporter.import(ctx, uri) }
             if (snd == null) { soundError = "Не удалось открыть эту мелодию"; return@launch }
             soundError = null
             timerSound.path?.let { SoundImporter.discard(it) }
@@ -104,85 +115,66 @@ fun SettingsScreen(items: List<SetupItem>, onClose: () -> Unit) {
 
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
         TopBar(onClose)
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
-            Spacer(Modifier.height(12.dp))
-            DotTitle("Настройки", Modifier.padding(horizontal = 4.dp))
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
+            Spacer(Modifier.height(8.dp))
+            Title("Настройки", Modifier.padding(horizontal = 8.dp))
 
-            Section("Glyph-интерфейс") {
-                NCard {
-                    Column {
-                        NText(if (status.ok) "Подключено" else "Не подключено", style = NType.heading, color = if (status.ok) n.success else n.display)
-                        Spacer(Modifier.height(8.dp))
-                        NMeta(status.text)
-                        Spacer(Modifier.height(4.dp))
-                        NMeta(GlyphEngine.deviceInfo, color = n.disabled)
-                        Spacer(Modifier.height(16.dp))
-                        NButton("Проверить глифы", { testResult = GlyphEngine.selfTest() }, height = 46.dp)
-                        testResult?.let { Spacer(Modifier.height(10.dp)); NMeta(it) }
-                    }
+            NSection("Glyph")
+            NGroup {
+                NRow("Glyph-интерфейс", subtitle = status.text) {
+                    Box(Modifier.size(7.dp).background(if (status.ok) n.success else n.accent, CircleShape))
+                    Spacer(Modifier.width(8.dp))
+                    NCaps(if (status.ok) "подключено" else "нет связи", color = if (status.ok) n.success else n.accent)
                 }
-                Spacer(Modifier.height(12.dp))
-                NCard(padding = 20.dp) {
-                    Column {
-                        NText("Если не подключается", style = NType.bodyMedium)
-                        Spacer(Modifier.height(8.dp))
+                NRow("Проверить глифы", subtitle = testResult ?: "Зажигает все полоски по очереди", onClick = { testResult = GlyphEngine.selfTest() }) {
+                    NIcon(Ic.PLAY, tint = n.secondary, size = 18.dp)
+                }
+                NRow("Сдвиг света", subtitle = "Если свет опережает звук или отстаёт") {
+                    CircleButton({ AppSettings.setSyncOffset(ctx, offset - 20) }, size = 40.dp) { Text("−", style = NType.heading, color = n.display) }
+                    Text("%+d мс".format(offset), Modifier.width(76.dp), style = NType.bodyMedium, color = n.display, textAlign = TextAlign.Center)
+                    CircleButton({ AppSettings.setSyncOffset(ctx, offset + 20) }, size = 40.dp) { Text("+", style = NType.heading, color = n.display) }
+                }
+                if (!status.ok) {
+                    NRow("Если не подключается", onClick = { helpOpen = !helpOpen }) {
+                        NIcon(Ic.CHEVRON, Modifier.rotate(if (helpOpen) 270f else 90f), tint = n.disabled, size = 18.dp)
+                    }
+                    if (helpOpen) Column(Modifier.nRow().padding(20.dp)) {
                         NMeta("1. В настройках телефона включите «Glyph-интерфейс».")
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.height(6.dp))
                         NMeta("2. На Nothing OS старше Android 16 один раз нужен доступ разработчика. Подключите телефон по USB и выполните:")
-                        Spacer(Modifier.height(8.dp))
+                        Spacer(Modifier.height(10.dp))
                         NText("adb shell settings put global nt_glyph_interface_debug_enable 1", style = NType.meta, color = n.primary)
-                        Spacer(Modifier.height(8.dp))
+                        Spacer(Modifier.height(10.dp))
                         NMeta("Действует 48 часов. После этого перезапустите приложение.")
                     }
                 }
-                Spacer(Modifier.height(20.dp))
-                NLabel("Синхронизация света", Modifier.padding(start = 4.dp))
-                Spacer(Modifier.height(6.dp))
-                NMeta("Если свет опережает звук или отстаёт, сдвиньте его.", Modifier.padding(start = 4.dp))
-                Spacer(Modifier.height(12.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    NButton("−20", { AppSettings.setSyncOffset(ctx, offset - 20) }, height = 44.dp)
-                    Spacer(Modifier.width(16.dp))
-                    Text("%+d мс".format(offset), style = NType.heading, color = n.display)
-                    Spacer(Modifier.width(16.dp))
-                    NButton("+20", { AppSettings.setSyncOffset(ctx, offset + 20) }, height = 44.dp)
+            }
+            NMeta(GlyphEngine.deviceInfo, Modifier.padding(start = 8.dp, top = 10.dp), color = n.disabled)
+
+            NSection("Таймер")
+            NGroup {
+                NRow("Мелодия таймера", leading = Ic.MUSIC, subtitle = soundError ?: timerSound.name, onClick = openSystemPicker) {
+                    NIcon(Ic.CHEVRON, tint = n.disabled, size = 18.dp)
                 }
+                if (timerSound.path != null) NRow("Вернуть стандартный сигнал", titleColor = n.secondary, onClick = {
+                    SoundImporter.discard(timerSound.path)
+                    soundError = null
+                    AppSettings.setTimerSound(ctx, TimerSound(null, "Стандартный сигнал"))
+                })
             }
 
-            Section("Мелодия таймера") {
-                Row(
-                    Modifier.fillMaxWidth().nCard(24.dp).padding(horizontal = 22.dp, vertical = 18.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    NText(timerSound.name, style = NType.heading, modifier = Modifier.weight(1f))
-                }
-                soundError?.let { Spacer(Modifier.height(8.dp)); NMeta(it, Modifier.padding(start = 4.dp), color = n.accent) }
-                Spacer(Modifier.height(12.dp))
-                NButton("Выбрать мелодию", openSystemPicker, Modifier.fillMaxWidth(), filled = true, height = 48.dp)
-            }
-
-            Section("Разрешения") {
-                Column(Modifier.fillMaxWidth().nCard(24.dp)) {
-                    items.forEachIndexed { i, item ->
-                        if (i > 0) Hairline()
-                        Row(
-                            Modifier.fillMaxWidth()
-                                .then(if (!item.ok && item.action != null) Modifier.clickable { item.action.invoke() } else Modifier)
-                                .padding(horizontal = 22.dp, vertical = 18.dp),
-                            verticalAlignment = Alignment.Top,
-                        ) {
-                            Column(Modifier.weight(1f)) {
-                                NText(item.title, style = NType.bodyMedium)
-                                Spacer(Modifier.height(2.dp))
-                                NMeta(item.hint)
-                            }
-                            Spacer(Modifier.width(12.dp))
-                            if (item.ok) NIcon(Ic.CHECK, tint = n.success) else NLabel("Разрешить", color = n.display)
+            NSection("Разрешения")
+            NGroup {
+                items.forEach { item ->
+                    NRow(item.title, subtitle = item.hint, onClick = if (!item.ok && item.action != null) item.action else null) {
+                        if (item.ok) NIcon(Ic.CHECK, tint = n.success, size = 22.dp)
+                        else Box(Modifier.clip(CircleShape).background(n.display, CircleShape).padding(horizontal = 14.dp, vertical = 8.dp)) {
+                            Text("Разрешить", color = n.bg, style = NType.bodyMedium.copy(fontSize = 13.sp))
                         }
                     }
                 }
             }
-            Spacer(Modifier.height(64.dp))
+            Spacer(Modifier.height(48.dp))
         }
     }
 }

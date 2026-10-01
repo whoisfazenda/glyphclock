@@ -1,6 +1,7 @@
 package dev.glyphalarm.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -12,8 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -39,6 +39,8 @@ private fun stopwatchParts(ms: Long): Pair<String, String> {
     return main to ".%02d".format(cs)
 }
 
+private fun stopwatchText(ms: Long) = stopwatchParts(ms).let { it.first + it.second }
+
 @Composable
 fun StopwatchScreen(onSettings: () -> Unit) {
     val n = LocalN.current
@@ -59,41 +61,56 @@ fun StopwatchScreen(onSettings: () -> Unit) {
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
         ScreenTitle("Секундомер") { NIconButton(Ic.GEAR, onSettings) }
 
-        Column(Modifier.fillMaxWidth().padding(top = 28.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        // the time: dot-matrix, centred
+        Column(Modifier.fillMaxWidth().padding(top = if (sw.laps.isEmpty()) 56.dp else 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(verticalAlignment = Alignment.Bottom) {
-                Text(main, style = NType.dotDisplay.copy(fontSize = 64.sp), color = if (sw.running || elapsed > 0) n.display else n.disabled)
+                Text(main, style = NType.dotDisplay.copy(fontSize = if (main.length > 5) 54.sp else 68.sp), color = if (sw.running || elapsed > 0) n.display else n.disabled)
                 Text(cs, style = NType.dotNumber.copy(fontSize = 30.sp), color = n.secondary, modifier = Modifier.padding(start = 2.dp, bottom = 8.dp))
             }
-            if (sw.laps.isNotEmpty()) {
-                Spacer(Modifier.height(6.dp))
-                NMeta("Круг ${sw.laps.size + 1} · ${stopwatchParts(lapMs).let { it.first + it.second }}")
-            }
-            Spacer(Modifier.height(36.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(22.dp), verticalAlignment = Alignment.CenterVertically) {
-                CircleButton({ StopwatchRepo.reset(ctx) }, size = 68.dp) { NIcon(Ic.RESET, tint = if (elapsed > 0) n.display else n.disabled) }
-                CircleButton({ StopwatchRepo.toggle(ctx) }, size = 92.dp, filled = true) {
-                    NIcon(if (sw.running) Ic.PAUSE else Ic.PLAY, tint = n.bg, size = 34.dp)
+            Spacer(Modifier.height(8.dp))
+            NCaps(
+                when {
+                    sw.laps.isNotEmpty() -> "Круг ${sw.laps.size + 1} · ${stopwatchText(lapMs)}"
+                    sw.running -> "Идёт"
+                    elapsed > 0 -> "Пауза"
+                    else -> "Готов"
+                },
+                color = if (sw.running) n.primary else n.secondary,
+            )
+        }
+
+        // laps, newest first, as one group of rows
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            if (sw.laps.isNotEmpty()) LazyColumn(
+                Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                itemsIndexed(sw.laps, key = { _, l -> l.number }) { i, l ->
+                    val color = when (l.number) { best -> n.success; worst -> n.accent; else -> n.display }
+                    Row(
+                        Modifier.animateItem().nRow(groupShape(i, sw.laps.size)).padding(horizontal = 20.dp, vertical = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        NCaps("%02d".format(l.number), Modifier.width(44.dp), color = n.secondary)
+                        Text(stopwatchText(l.lapMs), style = NType.bodyMedium, color = color, modifier = Modifier.weight(1f))
+                        NMeta(stopwatchText(l.totalMs))
+                    }
                 }
-                CircleButton({ StopwatchRepo.lap(ctx) }, size = 68.dp) { NIcon(Ic.LAP, tint = if (sw.running) n.display else n.disabled) }
             }
         }
 
-        Spacer(Modifier.height(28.dp))
-        LazyColumn(
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 130.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+        // controls sit right above the floating bar, within thumb reach
+        Row(
+            Modifier.fillMaxWidth().padding(top = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(22.dp, Alignment.CenterHorizontally), verticalAlignment = Alignment.CenterVertically,
         ) {
-            items(sw.laps, key = { it.number }) { l ->
-                val color = when (l.number) { best -> n.success; worst -> n.accent; else -> n.display }
-                Row(
-                    Modifier.fillMaxWidth().nCard(20.dp).padding(horizontal = 20.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    NMeta("Круг ${l.number}", Modifier.width(72.dp))
-                    Text(stopwatchParts(l.lapMs).let { it.first + it.second }, style = NType.bodyMedium, color = color, modifier = Modifier.weight(1f))
-                    NMeta(stopwatchParts(l.totalMs).let { it.first + it.second })
-                }
+            CircleButton({ if (elapsed > 0) StopwatchRepo.reset(ctx) }, size = 64.dp) { NIcon(Ic.RESET, tint = if (elapsed > 0) n.display else n.disabled) }
+            CircleButton({ StopwatchRepo.toggle(ctx) }, size = 84.dp, filled = true) {
+                NIcon(if (sw.running) Ic.PAUSE else Ic.PLAY, tint = n.bg, size = 32.dp)
             }
+            CircleButton({ StopwatchRepo.lap(ctx) }, size = 64.dp) { NIcon(Ic.LAP, tint = if (sw.running) n.display else n.disabled) }
         }
+        Spacer(Modifier.height(navBarClearance() + 8.dp))
     }
 }

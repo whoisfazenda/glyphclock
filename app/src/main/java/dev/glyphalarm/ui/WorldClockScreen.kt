@@ -1,6 +1,8 @@
 package dev.glyphalarm.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,6 +33,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.heightIn
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.glyphalarm.data.WorldRepo
 import kotlinx.coroutines.delay
@@ -62,7 +68,7 @@ private fun offsetWord(then: ZonedDateTime, local: ZonedDateTime): String {
 }
 
 @Composable
-fun WorldClockScreen(onSettings: () -> Unit) {
+fun WorldClockScreen(adding: Boolean, onAdding: (Boolean) -> Unit, onSettings: () -> Unit) {
     val n = LocalN.current
     val ctx = LocalContext.current
     val is24 = rememberIs24h()
@@ -70,54 +76,53 @@ fun WorldClockScreen(onSettings: () -> Unit) {
     var tick by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) { while (true) { delay(1000); tick = System.currentTimeMillis() } }
     var editing by remember { mutableStateOf(false) }
-    var adding by remember { mutableStateOf(false) }
 
     if (adding) {
-        CityPicker(onPick = { WorldRepo.add(ctx, it); adding = false }, onBack = { adding = false })
+        CityPicker(taken = zones, onPick = { WorldRepo.add(ctx, it); onAdding(false) }, onBack = { onAdding(false) })
         return
     }
+    if (zones.isEmpty() && editing) editing = false
 
     val local = ZonedDateTime.now().also { tick }
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
-        ScreenTitle("Мировое время") {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                NIconButton(Ic.PLUS, { adding = true })
-                NIconButton(Ic.GEAR, onSettings)
-            }
-        }
+        ScreenTitle("Мировое время") { NIconButton(Ic.GEAR, onSettings) }
         LazyColumn(
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 130.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = navBarClearance() + 16.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             item {
-                Column(Modifier.fillMaxWidth().nCard(28.dp).padding(24.dp)) {
+                Column(Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, top = 8.dp)) {
+                    NCaps("Местное время · " + WorldRepo.cityName(local.zone.id))
+                    Spacer(Modifier.height(18.dp))
                     val (txt, suffix) = formatClock(local.hour, local.minute, is24)
                     Row(verticalAlignment = Alignment.Bottom) {
-                        DotText(txt, Modifier.weight(1f, fill = false), maxPitch = 12.dp)
+                        DotText(txt, Modifier.weight(1f, fill = false), maxPitch = 14.dp)
                         if (suffix.isNotEmpty()) { Spacer(Modifier.width(10.dp)); NText(suffix, style = NType.heading, color = n.secondary) }
                     }
-                    Spacer(Modifier.height(18.dp))
-                    NMeta(local.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL)) + " · " + WorldRepo.cityName(local.zone.id))
+                    Spacer(Modifier.height(16.dp))
+                    NText(local.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL)).replaceFirstChar { it.uppercase() }, style = NType.label, color = n.primary)
                 }
             }
-            if (zones.isNotEmpty()) item {
-                Row(Modifier.fillMaxWidth().padding(start = 4.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    NLabel("Города", Modifier.weight(1f))
-                    Box(Modifier.clickable { editing = !editing }.padding(8.dp)) { NLabel(if (editing) "Готово" else "Изменить", color = n.display) }
+            item {
+                NSection("Города") {
+                    if (zones.isNotEmpty()) Box(Modifier.clip(CircleShape).clickable { editing = !editing }.padding(horizontal = 10.dp, vertical = 6.dp)) {
+                        NCaps(if (editing) "Готово" else "Изменить", color = n.display)
+                    }
                 }
             }
-            items(zones, key = { it }) { id ->
+            itemsIndexed(zones, key = { _, id -> id }) { i, id ->
                 val t = ZonedDateTime.now(ZoneId.of(id)).also { tick }
                 val (txt, suffix) = formatClock(t.hour, t.minute, is24)
                 Row(
-                    Modifier.fillMaxWidth().nCard(24.dp).padding(horizontal = 22.dp, vertical = 18.dp),
+                    Modifier.animateItem().nRow(groupShape(i, zones.size)).heightIn(min = 76.dp).padding(start = 20.dp, end = if (editing) 8.dp else 20.dp, top = 14.dp, bottom = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
-                        NText(WorldRepo.cityName(id), style = NType.heading)
+                        NText(WorldRepo.cityName(id), style = NType.body.copy(fontSize = 18.sp), maxLines = 1)
                         Spacer(Modifier.height(2.dp))
                         NMeta("${dayWord(t, local)} · ${offsetWord(t, local)}")
                     }
+                    Spacer(Modifier.width(12.dp))
                     if (editing) {
                         NIconButton(Ic.TRASH, { WorldRepo.remove(ctx, id) }, tint = n.accent)
                     } else {
@@ -128,33 +133,37 @@ fun WorldClockScreen(onSettings: () -> Unit) {
                     }
                 }
             }
-            if (zones.isEmpty()) item { NMeta("Городов пока нет. Нажмите «+», чтобы добавить.", Modifier.padding(24.dp), color = n.disabled) }
+            if (zones.isEmpty()) item {
+                NText("Городов пока нет. Нажмите «+», чтобы добавить.", Modifier.nRow(groupShape(0, 1)).padding(20.dp), style = NType.label, color = n.secondary)
+            }
         }
     }
 }
 
 @Composable
-private fun CityPicker(onPick: (String) -> Unit, onBack: () -> Unit) {
+private fun CityPicker(taken: List<String>, onPick: (String) -> Unit, onBack: () -> Unit) {
     val n = LocalN.current
     val is24 = rememberIs24h()
     var query by remember { mutableStateOf("") }
     val q = query.trim().lowercase()
-    val results = remember(q) {
-        if (q.isEmpty()) WorldRepo.allZones
-        else WorldRepo.allZones.filter {
+    val results = remember(q, taken) {
+        val free = WorldRepo.allZones.filter { it !in taken }
+        if (q.isEmpty()) free
+        else free.filter {
             WorldRepo.cityName(it).lowercase().contains(q) || WorldRepo.regionName(it).lowercase().contains(q) ||
                 it.substringAfterLast('/').replace('_', ' ').lowercase().contains(q)
         }
     }
+    BackHandler { onBack() }
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
         TopBar(onBack)
-        Spacer(Modifier.height(12.dp))
-        DotTitle("Добавить город", Modifier.padding(horizontal = 24.dp))
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(8.dp))
+        Title("Добавить город", Modifier.padding(horizontal = 24.dp))
+        Spacer(Modifier.height(20.dp))
         BasicTextField(
             value = query, onValueChange = { query = it }, singleLine = true,
             textStyle = NType.body.copy(color = n.display), cursorBrush = SolidColor(n.display),
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             decorationBox = { inner ->
                 Box(Modifier.fillMaxWidth().nCard(999.dp).padding(horizontal = 22.dp, vertical = 16.dp)) {
                     if (query.isEmpty()) Text("Поиск города или региона", style = NType.body, color = n.disabled)
@@ -162,20 +171,21 @@ private fun CityPicker(onPick: (String) -> Unit, onBack: () -> Unit) {
                 }
             },
         )
-        Spacer(Modifier.height(12.dp))
-        LazyColumn(contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(results, key = { it }) { id ->
+        Spacer(Modifier.height(16.dp))
+        if (results.isEmpty()) NText("Ничего не найдено", Modifier.padding(horizontal = 24.dp), style = NType.label, color = n.secondary)
+        LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            itemsIndexed(results, key = { _, id -> id }) { i, id ->
                 val t = ZonedDateTime.now(ZoneId.of(id))
                 val (txt, suffix) = formatClock(t.hour, t.minute, is24)
                 Row(
-                    Modifier.fillMaxWidth().nCard(20.dp).clickable { onPick(id) }.padding(horizontal = 20.dp, vertical = 14.dp),
+                    Modifier.nRow(groupShape(i, results.size)).clickable { onPick(id) }.padding(horizontal = 20.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
-                        NText(WorldRepo.cityName(id), style = NType.bodyMedium)
+                        NText(WorldRepo.cityName(id), style = NType.body, maxLines = 1)
                         NMeta(WorldRepo.regionName(id))
                     }
-                    NText("$txt $suffix".trim(), style = NType.meta, color = n.secondary)
+                    NText("$txt $suffix".trim(), style = NType.label, color = n.secondary)
                 }
             }
         }

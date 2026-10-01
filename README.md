@@ -18,3 +18,7 @@ APK: `app/build/outputs/apk/release/app-release.apk` (подписан debug-к�
 
 - `app/libs/glyph-matrix-sdk-2.0.aar` — Glyph Developer Kit от Nothing.
 - `app/src/main/res/font/matrix_print.ttf` — MatrixSans Print, SIL OFL 1.1 (github.com/FriedOrange/MatrixSans).
+
+## Fonts
+
+MatrixSans Print (dot matrix) and Oranienbaum (headlines), both SIL Open Font License 1.1.

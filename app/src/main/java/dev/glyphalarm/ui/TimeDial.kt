@@ -79,6 +79,7 @@ fun TimeDial(hour: Int, minute: Int, is24: Boolean, onChange: (hour: Int, minute
     val curMinute by rememberUpdatedState(minute)
     val cb by rememberUpdatedState(onChange)
     val measurer = rememberTextMeasurer()
+    val tick by rememberUpdatedState(rememberTick())
     val pm = hour >= 12
     val ampm = remember { DateFormatSymbols.getInstance().amPmStrings }
 
@@ -123,10 +124,10 @@ fun TimeDial(hour: Int, minute: Int, is24: Boolean, onChange: (hour: Int, minute
                                     val h12 = if (idx == 0) 12 else idx
                                     (h12 % 12) + (if (curHour >= 12) 12 else 0)
                                 }
-                                if (h != curHour) cb(h, curMinute)
+                                if (h != curHour) { tick(); cb(h, curMinute) }
                             } else {
                                 val m = ((ang + 3) / 6).toInt() % 60
-                                if (m != curMinute) cb(curHour, m)
+                                if (m != curMinute) { tick(); cb(curHour, m) }
                             }
                         }
                         apply(down.position)

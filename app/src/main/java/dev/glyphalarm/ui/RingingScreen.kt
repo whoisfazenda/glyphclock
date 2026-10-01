@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -54,30 +55,34 @@ fun RingingScreen(onDone: () -> Unit) {
     var clock by remember { mutableStateOf(LocalTime.now()) }
     LaunchedEffect(Unit) { while (true) { delay(1000); clock = LocalTime.now() } }
 
-    val alarm = ringing?.alarm
+    // keep showing the last alarm while the screen closes, so the text does not flip on the way out
+    var shown by remember { mutableStateOf(ringing?.alarm) }
+    ringing?.alarm?.let { if (it != shown) shown = it }
+    val alarm = shown
     val isTimer = (alarm?.id ?: 0) >= TimerRepo.ID_BASE
     val (txt, suffix) = formatClock(clock.hour, clock.minute, is24)
+    val label = alarm?.label?.trim()?.takeIf { it.isNotEmpty() && !(isTimer && it == "Таймер") }
 
     AmbientBackground {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 24.dp)) {
-            Row(Modifier.fillMaxWidth().padding(top = 28.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().padding(top = 32.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(9.dp).background(if (blink) n.accent else n.bg, CircleShape))
                 Spacer(Modifier.width(12.dp))
-                NText(alarm?.label?.ifBlank { null } ?: if (isTimer) "Таймер" else "Будильник", style = NType.bodyMedium, color = n.primary)
+                NCaps(if (isTimer) "Таймер · время вышло" else "Будильник", color = n.primary)
             }
 
-            Spacer(Modifier.height(56.dp))
+            Spacer(Modifier.height(28.dp))
+            Title(label ?: if (isTimer) "Время вышло" else "Пора вставать", style = NType.title, color = n.display)
+
+            Spacer(Modifier.height(28.dp))
             Row(verticalAlignment = Alignment.Bottom) {
                 DotText(txt, Modifier.weight(1f, fill = false))
                 if (suffix.isNotEmpty()) { Spacer(Modifier.width(10.dp)); NText(suffix, style = NType.heading, color = n.secondary) }
             }
-            if (isTimer) { Spacer(Modifier.height(14.dp)); NMeta("Время вышло") }
 
-            Spacer(Modifier.weight(1f))
-            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                GlyphPhone(frame, Modifier.width(260.dp))
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                GlyphPhone(frame, Modifier.widthIn(max = 250.dp).fillMaxWidth())
             }
-            Spacer(Modifier.weight(1f))
 
             NButton(
                 if (isTimer) "+1 мин" else "Отложить · ${alarm?.snoozeMin ?: 10} мин",
@@ -88,7 +93,7 @@ fun RingingScreen(onDone: () -> Unit) {
             NButton(
                 "Стоп",
                 { ctx.startService(AlarmService.actionIntent(ctx, AlarmService.ACTION_DISMISS)); onDone() },
-                Modifier.fillMaxWidth(), filled = true, height = 66.dp,
+                Modifier.fillMaxWidth(), filled = true, height = 68.dp,
             )
             Spacer(Modifier.height(24.dp))
         }
