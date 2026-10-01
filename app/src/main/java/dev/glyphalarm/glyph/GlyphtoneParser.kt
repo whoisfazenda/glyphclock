@@ -41,9 +41,14 @@ object GlyphtoneParser {
     fun parseFile(file: File): GlyphTrack? = runCatching { parse(file.readBytes()) }.getOrNull()
 
     fun parse(bytes: ByteArray): GlyphTrack? = try {
-        val tags = readComments(bytes)
-        val author = tags?.get("AUTHOR")
-        if (author.isNullOrBlank()) null else decodeTrack(author, tags["TITLE"], tags["ALBUM"])
+        val tags = readComments(bytes) ?: scanComments(bytes)
+        if (tags == null) null else {
+            // the recording normally sits in AUTHOR; built-in sounds may keep it under another tag
+            val keys = listOf("AUTHOR") + tags.filter { it.key != "AUTHOR" && it.value.length > 64 }.entries.sortedByDescending { it.value.length }.map { it.key }
+            keys.firstNotNullOfOrNull { k ->
+                tags[k]?.takeIf { it.isNotBlank() }?.let { v -> runCatching { decodeTrack(v, tags["TITLE"], tags["ALBUM"]) }.getOrNull() }
+            }
+        }
     } catch (t: Throwable) {
         null
     }
@@ -120,7 +125,22 @@ object GlyphtoneParser {
             pos = dataPos
         }
         val p = packets.getOrNull(1) ?: return null
+        return commentsOf(p)
+    }
 
+    /** Fallback for files whose Ogg framing the walker does not follow: look for the Vorbis comment header directly. */
+    private fun scanComments(b: ByteArray): Map<String, String>? {
+        val limit = minOf(b.size - 7, 1 shl 20)
+        for (i in 0 until limit) {
+            if (b[i].toInt() == 3 && b[i + 1] == 'v'.code.toByte() && b[i + 2] == 'o'.code.toByte() && b[i + 3] == 'r'.code.toByte() &&
+                b[i + 4] == 'b'.code.toByte() && b[i + 5] == 'i'.code.toByte() && b[i + 6] == 's'.code.toByte()) {
+                return runCatching { commentsOf(b.copyOfRange(i, b.size)) }.getOrNull()
+            }
+        }
+        return null
+    }
+
+    private fun commentsOf(p: ByteArray): Map<String, String>? {
         var off = when {
             p.size > 7 && p[0].toInt() == 3 && String(p, 1, 6, Charsets.US_ASCII) == "vorbis" -> 7
             p.size > 8 && String(p, 0, 8, Charsets.US_ASCII) == "OpusTags" -> 8
