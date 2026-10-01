@@ -64,24 +64,9 @@ import java.time.ZonedDateTime
 
 private sealed interface SoundInfo {
     data object Default : SoundInfo
-    /** [detail] says what the file is and which tags it carries, to find out why no light recording was found. */
-    data class NoGlyph(val detail: String) : SoundInfo
+    data object NoGlyph : SoundInfo
     data class Track(val columns: Int, val seconds: Double, val mapped: Boolean, val pack: String?) : SoundInfo
 }
-
-private fun describe(f: File): String = runCatching {
-    val head = f.inputStream().use { it.readNBytes(512 * 1024) }
-    val magic = when {
-        head.size >= 4 && String(head, 0, 4, Charsets.ISO_8859_1) == "OggS" -> "Ogg"
-        head.size >= 3 && String(head, 0, 3, Charsets.ISO_8859_1) == "ID3" -> "MP3"
-        head.size >= 4 && String(head, 0, 4, Charsets.ISO_8859_1) == "fLaC" -> "FLAC"
-        head.size >= 4 && String(head, 0, 4, Charsets.ISO_8859_1) == "RIFF" -> "WAV"
-        head.size >= 8 && String(head, 4, 4, Charsets.ISO_8859_1) == "ftyp" -> "MP4/M4A"
-        else -> "?"
-    }
-    val tags = GlyphtoneParser.tags(head).keys.joinToString(",").ifEmpty { tr("без тегов", "no tags") }
-    "$magic, ${f.length() / 1024} KB, $tags"
-}.getOrDefault("?")
 
 /**
  * The alarm editor as a bottom sheet over the alarm list: time, days, name, melody, vibration.
@@ -125,7 +110,7 @@ fun AlarmSheet(alarmId: Int, onClose: () -> Unit, onDeleted: (Alarm) -> Unit) {
         value = if (p == null) SoundInfo.Default else withContext(Dispatchers.IO) {
             GlyphtoneParser.parseFile(File(p))
                 ?.let { SoundInfo.Track(it.sourceColumns, it.durationMs / 1000.0, it.mapped, it.album?.trim()?.ifBlank { null }) }
-                ?: SoundInfo.NoGlyph(describe(File(p)))
+                ?: SoundInfo.NoGlyph
         }
     }
 
@@ -232,7 +217,7 @@ fun AlarmSheet(alarmId: Int, onClose: () -> Unit, onDeleted: (Alarm) -> Unit) {
                     }
                     val infoLine = when (val i = info) {
                         SoundInfo.Default -> tr("Системный сигнал · без подсветки Glyph", "System tone · no Glyph light")
-                        is SoundInfo.NoGlyph -> tr("Без подсветки Glyph", "No Glyph light") + " · " + i.detail
+                        SoundInfo.NoGlyph -> tr("Без подсветки Glyph", "No Glyph light")
                         is SoundInfo.Track -> listOfNotNull(
                             i.pack,
                             if (i.mapped) tr("подсветка для другого телефона, по ритму", "light made for another phone, follows the beat")
