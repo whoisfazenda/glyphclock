@@ -240,6 +240,26 @@ object AppSettings {
     private val _alarmSound = MutableStateFlow(TimerSound(null, ""))
     /** Melody given to every new alarm; null path = the phone's own alarm tone. */
     val alarmSound: StateFlow<TimerSound> = _alarmSound.asStateFlow()
+    /** Night mode: dims the glyphs between [nightFromMin] and [nightToMin] (minutes after midnight). */
+    data class Night(val on: Boolean = false, val fromMin: Int = 22 * 60, val toMin: Int = 7 * 60, val levelPct: Int = 25) {
+        fun factorAt(minuteOfDay: Int): Float {
+            if (!on) return 1f
+            val inside = if (fromMin <= toMin) minuteOfDay in fromMin until toMin else minuteOfDay >= fromMin || minuteOfDay < toMin
+            return if (inside) levelPct / 100f else 1f
+        }
+    }
+    private val _night = MutableStateFlow(Night())
+    val night: StateFlow<Night> = _night.asStateFlow()
+
+    /** Brightness factor for the glyphs right now (1 = full). */
+    fun glyphFactor(): Float = _night.value.let { it.factorAt(java.time.LocalTime.now().let { t -> t.hour * 60 + t.minute }) }
+
+    fun setNight(ctx: Context, n: Night) {
+        ensure(ctx)
+        _night.value = n.copy(levelPct = n.levelPct.coerceIn(5, 100))
+        prefs(ctx).edit().putBoolean("night_on", n.on).putInt("night_from", n.fromMin).putInt("night_to", n.toMin).putInt("night_level", _night.value.levelPct).apply()
+    }
+
     private val _riseSec = MutableStateFlow(30)
     /** How long the volume (and the glyph intensity) takes to climb to the top. */
     val riseSec: StateFlow<Int> = _riseSec.asStateFlow()
@@ -257,6 +277,7 @@ object AppSettings {
         )
         _alarmSound.value = TimerSound(p.getString("alarm_path", null), p.getString("alarm_name", "") ?: "", p.getString("alarm_uri", null))
         _riseSec.value = p.getInt("rise_sec", 30)
+        _night.value = Night(p.getBoolean("night_on", false), p.getInt("night_from", 22 * 60), p.getInt("night_to", 7 * 60), p.getInt("night_level", 25))
         loaded = true
     }
 

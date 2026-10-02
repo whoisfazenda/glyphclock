@@ -2,6 +2,9 @@ package dev.glyphalarm.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -90,6 +93,13 @@ fun countdown(to: ZonedDateTime, now: ZonedDateTime): String {
     }
 }
 
+/** Skips (or takes back) the nearest ring of a repeating alarm and re-plans it. */
+private fun skipNext(ctx: android.content.Context, a: Alarm, skip: Boolean) {
+    val updated = a.withSkip(skip)
+    AlarmRepo.upsert(ctx, updated)
+    AlarmScheduler.schedule(ctx, updated)
+}
+
 /** Bottom padding that keeps the end of a list clear of the floating bar. */
 @Composable
 fun navBarClearance() = NavBarSpace + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -133,6 +143,13 @@ fun AlarmsScreen(onEdit: (Int) -> Unit, onSettings: () -> Unit) {
                     if (nextAt != null) {
                         val day = nextAt.dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, Locale.getDefault()).replaceFirstChar { it.uppercase() }
                         NText("$day · ${countdown(nextAt, now)}", style = NType.label, color = n.primary)
+                        if (next != null && next.days != 0) {
+                            Spacer(Modifier.height(14.dp))
+                            Box(
+                                Modifier.clip(CircleShape).border(1.dp, n.borderVisible, CircleShape)
+                                    .clickable { skipNext(ctx, next, true) }.padding(horizontal = 16.dp, vertical = 9.dp),
+                            ) { NText(tr("Пропустить этот раз", "Skip this one"), style = NType.meta.copy(fontSize = 13.sp), color = n.primary) }
+                        }
                     } else {
                         NText(
                             if (alarms.isEmpty()) tr("Нажмите «+», чтобы создать первый будильник.", "Tap “+” to create your first alarm.") else tr("Включите будильник или создайте новый.", "Turn an alarm on or create a new one."),
@@ -142,7 +159,7 @@ fun AlarmsScreen(onEdit: (Int) -> Unit, onSettings: () -> Unit) {
                 }
             }
             items(sorted, key = { it.id }) { a ->
-                AlarmCard(a, is24, Modifier.animateItem(), onClick = { onEdit(a.id) }, onToggle = { on ->
+                AlarmCard(a, is24, Modifier.animateItem(), onClick = { onEdit(a.id) }, onUnskip = { skipNext(ctx, a, false) }, onToggle = { on ->
                     val updated = a.copy(enabled = on)
                     AlarmRepo.upsert(ctx, updated)
                     if (on) AlarmScheduler.schedule(ctx, updated) else AlarmScheduler.cancel(ctx, a.id)
@@ -153,7 +170,7 @@ fun AlarmsScreen(onEdit: (Int) -> Unit, onSettings: () -> Unit) {
 }
 
 @Composable
-private fun AlarmCard(a: Alarm, is24: Boolean, modifier: Modifier, onClick: () -> Unit, onToggle: (Boolean) -> Unit) {
+private fun AlarmCard(a: Alarm, is24: Boolean, modifier: Modifier, onClick: () -> Unit, onUnskip: () -> Unit, onToggle: (Boolean) -> Unit) {
     val n = LocalN.current
     val (txt, suffix) = formatClock(a.hour, a.minute, is24)
     Row(
@@ -172,6 +189,15 @@ private fun AlarmCard(a: Alarm, is24: Boolean, modifier: Modifier, onClick: () -
             )
             Spacer(Modifier.height(2.dp))
             NText(a.soundTitle(), style = NType.meta, color = n.disabled, maxLines = 1)
+            if (a.enabled && a.isSkipped()) {
+                val again = a.nextTrigger().dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, Locale.getDefault()).replaceFirstChar { it.uppercase() }
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    NCaps(tr("Пропущен · снова $again", "Skipped · back $again"), color = n.accent)
+                    Spacer(Modifier.width(12.dp))
+                    Box(Modifier.clip(CircleShape).clickable(onClick = onUnskip).padding(horizontal = 8.dp, vertical = 4.dp)) { NCaps(tr("Вернуть", "Undo"), color = n.display) }
+                }
+            }
         }
         Spacer(Modifier.width(12.dp))
         NSwitch(a.enabled, onToggle)

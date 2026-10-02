@@ -144,6 +144,9 @@ fun SettingsScreen(items: List<SetupItem>, onClose: () -> Unit) {
     val maxVol = remember { audio.getStreamMaxVolume(AudioManager.STREAM_ALARM).coerceAtLeast(1) }
     var vol by remember { mutableFloatStateOf(audio.getStreamVolume(AudioManager.STREAM_ALARM).toFloat().coerceAtLeast(1f)) }
     val lang = remember { Lang.current(ctx) }
+    val night by AppSettings.night.collectAsStateWithLifecycle()
+    val is24 = rememberIs24h()
+    var nightPicker by remember { mutableIntStateOf(-1) } // 0 = start, 1 = end
 
     BackHandler { onClose() }
 
@@ -234,6 +237,25 @@ fun SettingsScreen(items: List<SetupItem>, onClose: () -> Unit) {
             }
             NMeta(GlyphEngine.deviceInfo, Modifier.padding(start = 8.dp, top = 10.dp), color = n.disabled)
 
+            NSection(tr("Ночной режим", "Night mode"))
+            NGroup {
+                ToggleRow(tr("Приглушать глифы ночью", "Dim the glyphs at night"), night.on, subtitle = tr("Тот же свет, но тусклее", "The same show, only dimmer")) {
+                    AppSettings.setNight(ctx, night.copy(on = it))
+                }
+                if (night.on) {
+                    fun clock(min: Int) = formatClock(min / 60, min % 60, is24).let { (a, b) -> "$a $b".trim() }
+                    NRow(tr("С", "From"), onClick = { nightPicker = 0 }) { NCaps(clock(night.fromMin), color = n.primary) }
+                    NRow(tr("До", "Until"), onClick = { nightPicker = 1 }) { NCaps(clock(night.toMin), color = n.primary) }
+                    Column(Modifier.nRow().padding(start = 20.dp, end = 12.dp, top = 16.dp, bottom = 8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            NText(tr("Яркость ночью", "Brightness at night"), Modifier.weight(1f), style = NType.body)
+                            NCaps("${night.levelPct}%", Modifier.padding(end = 8.dp), color = n.primary)
+                        }
+                        NSlider(night.levelPct.toFloat(), 5f..100f, 18, { AppSettings.setNight(ctx, night.copy(levelPct = ((it / 5f).toInt() * 5).coerceAtLeast(5))) })
+                    }
+                }
+            }
+
             NSection(tr("Разрешения", "Permissions"))
             NGroup {
                 items.forEach { item ->
@@ -247,5 +269,18 @@ fun SettingsScreen(items: List<SetupItem>, onClose: () -> Unit) {
             }
             Spacer(Modifier.height(48.dp))
         }
+    }
+
+    if (nightPicker >= 0) {
+        val start = if (nightPicker == 0) night.fromMin else night.toMin
+        TimeDialog(
+            hour = start / 60, minute = start % 60, is24 = is24, startMode = 0,
+            onDismiss = { nightPicker = -1 },
+            onOk = { h, m ->
+                val v = h * 60 + m
+                AppSettings.setNight(ctx, if (nightPicker == 0) night.copy(fromMin = v) else night.copy(toMin = v))
+                nightPicker = -1
+            },
+        )
     }
 }

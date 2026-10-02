@@ -125,7 +125,8 @@ fun AlarmSheet(alarmId: Int, onClose: () -> Unit, onDeleted: (Alarm) -> Unit) {
 
     fun save() {
         stopPreview()
-        val toSave = draft.copy(enabled = true, label = draft.label.trim())
+        val unchangedPlan = original != null && original.hour == draft.hour && original.minute == draft.minute && original.days == draft.days
+        val toSave = draft.copy(enabled = true, label = draft.label.trim(), skipped = if (unchangedPlan || draft.skipped != original?.skipped) draft.skipped else 0)
         AlarmRepo.upsert(ctx, toSave)
         AlarmScheduler.cancel(ctx, toSave.id) // also drops a snooze still pending for the old time
         AlarmScheduler.schedule(ctx, toSave)
@@ -228,6 +229,15 @@ fun AlarmSheet(alarmId: Int, onClose: () -> Unit, onDeleted: (Alarm) -> Unit) {
                         NIcon(Ic.CHEVRON, tint = n.disabled, size = 18.dp)
                     }
                     ToggleRow(tr("Вибрация", "Vibration"), draft.vibrate) { draft = draft.copy(vibrate = it) }
+                    if (draft.days != 0 && original != null) {
+                        val skippedNow = draft.isSkipped()
+                        ToggleRow(
+                            tr("Пропустить ближайший раз", "Skip the next ring"), skippedNow,
+                            subtitle = if (skippedNow) tr("Следующий звонок: ", "Rings next: ") + draft.nextTrigger().let { t ->
+                                t.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault()).replaceFirstChar { it.uppercase() } + " " + formatClock(t.hour, t.minute, is24).let { (a, b) -> "$a $b".trim() }
+                            } else null,
+                        ) { draft = draft.withSkip(it) }
+                    }
                 }
 
                 // unfold: the rest
@@ -296,7 +306,7 @@ fun AlarmSheet(alarmId: Int, onClose: () -> Unit, onDeleted: (Alarm) -> Unit) {
 
 /** The round dial in a small dialog, like the stock Clock's "Select time". */
 @Composable
-private fun TimeDialog(hour: Int, minute: Int, is24: Boolean, startMode: Int, onDismiss: () -> Unit, onOk: (Int, Int) -> Unit) {
+fun TimeDialog(hour: Int, minute: Int, is24: Boolean, startMode: Int, onDismiss: () -> Unit, onOk: (Int, Int) -> Unit) {
     val n = LocalN.current
     var h by remember { mutableIntStateOf(hour) }
     var m by remember { mutableIntStateOf(minute) }

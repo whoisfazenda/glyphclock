@@ -9,6 +9,7 @@ import android.util.Log
 import com.nothing.ketchum.Glyph
 import com.nothing.ketchum.GlyphManager
 import dev.glyphalarm.alarm.AlarmEngine
+import dev.glyphalarm.data.AppSettings
 import dev.glyphalarm.data.tr
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -151,8 +152,11 @@ object GlyphEngine {
         }
     }
 
-    private fun push(frame: IntArray) {
+    private fun push(raw: IntArray) {
         if (!session) return
+        // night mode: the same show, only dimmer
+        val k = AppSettings.glyphFactor()
+        val frame = if (k >= 0.999f) raw else IntArray(raw.size) { (raw[it] * k).toInt() }
         val m = gm ?: return
         try {
             if (!frameColorsBroken) {
