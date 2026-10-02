@@ -23,7 +23,7 @@ Download `GlyphClock.apk` from the [latest release](../../releases/latest) and o
 ## Glyph notes
 
 - Turn on **Glyph Interface** in the phone settings.
-- On Nothing OS older than Android 16, run once over USB: `adb shell settings put global nt_glyph_interface_debug_enable 1` (lasts 48 hours).
+- Normally nothing else is needed (it works out of the box on Android 16). Only if the app says it is not connected, e.g. on an older Nothing OS, run once over USB: `adb shell settings put global nt_glyph_interface_debug_enable 1` (lasts 48 hours).
 - The Glyph kit only drives the LEDs for an app that is on screen, so the app asks for the "display over other apps" permission to open the ringing screen by itself.
 - Sounds built into Nothing OS (Nothing Signals / Machines) play normally, but their light is kept by the system, so they have no Glyph light here. Use compositions made in Glyph Composer.
 
